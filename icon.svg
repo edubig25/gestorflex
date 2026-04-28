@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#1E1838" />
+  <text x="50%" y="50%" font-family="sans-serif" font-weight="bold" font-size="300" fill="#7C3AED" text-anchor="middle" dy=".3em">G</text>
+  <text x="50%" y="50%" font-family="sans-serif" font-weight="bold" font-size="300" fill="#A78BFA" text-anchor="middle" dy=".3em" transform="translate(10, -10)">⚡</text>
+</svg>
