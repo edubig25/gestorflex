@@ -133,6 +133,33 @@ ALTER TABLE servidores DISABLE ROW LEVEL SECURITY;
 
 -- Adiciona coluna em clientes
 ALTER TABLE clientes ADD COLUMN IF NOT EXISTS servidor_id bigint references servidores(id) on delete set null;
+
+-- Tabela WhatsApp Config
+CREATE TABLE IF NOT EXISTS wa_config (
+  id bigserial primary key,
+  msg_antes text,
+  msg_apos text,
+  msg_image text,
+  msg_audio text,
+  auto_time text,
+  dias_antes text,
+  dias_depois text,
+  auto_interval text,
+  auto_active boolean default false,
+  created_at timestamptz default now()
+);
+ALTER TABLE wa_config DISABLE ROW LEVEL SECURITY;
+
+-- Tabela WhatsApp Historico
+CREATE TABLE IF NOT EXISTS wa_historico (
+  id bigserial primary key,
+  cliente text,
+  numero text,
+  mensagem text,
+  status text,
+  created_at timestamptz default now()
+);
+ALTER TABLE wa_historico DISABLE ROW LEVEL SECURITY;
 </pre>
       </div>
       <button onclick="location.reload()" style="width:100%;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;border:none;border-radius:10px;padding:13px;font-size:.95rem;font-weight:600;cursor:pointer;box-shadow:0 4px 24px rgba(124,58,237,.4)">✅ Já executei o SQL — Recarregar</button>
@@ -405,12 +432,13 @@ document.querySelectorAll('.nav-item').forEach(item => {
 function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
-  const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', servidores: 'Servidores', configuracoes: 'Configurações' };
+  const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', servidores: 'Servidores', whatsapp: 'WhatsApp', configuracoes: 'Configurações' };
   $('topbar-title').textContent = titles[page] || '';
   if (page === 'clientes') loadClientes();
   if (page === 'financeiro') loadFinanceiro();
   if (page === 'captacao') loadCaptacao();
   if (page === 'servidores') loadServidoresPage();
+  if (page === 'whatsapp') loadWhatsApp();
   if (page === 'configuracoes') populateConfig();
 }
 
@@ -1056,8 +1084,389 @@ window.addEventListener('load', () => {
   }
 });
 
-window.openEdit = openEdit;
-window.renovar = renovar;
-window.confirmDeleteCliente = confirmDeleteCliente;
-window.confirmDeleteServidor = confirmDeleteServidor;
 window.openEditServidor = openEditServidor;
+
+// === WHATSAPP MODULE ===
+const EVO_URL = 'https://evolution-api-production-651d.up.railway.app';
+const EVO_KEY = 'daac7f5b35750676e44502934a7d6c51a4e483f39176635677e1fdb314791775';
+const INSTANCE_NAME = 'gestorflex';
+
+let waQueue = [];
+let waIsRunning = false;
+let waCheckInterval = null;
+let waStatus = 'desconectado';
+let waConfigData = null;
+
+async function evoApi(endpoint, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'apikey': EVO_KEY }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(`${EVO_URL}${endpoint}`, opts);
+    return await res.json();
+  } catch (err) {
+    console.error('Evo API Erro:', err);
+    return null;
+  }
+}
+
+async function loadWhatsApp() {
+  await checkWaConnection();
+  await loadWaConfig();
+  await loadWaHistory();
+  if (allClientes.length === 0) {
+    const { data } = await db.from('clientes').select('*');
+    allClientes = data || [];
+  }
+  updateWaManualCount();
+}
+
+async function checkWaConnection() {
+  const data = await evoApi(`/instance/connectionState/${INSTANCE_NAME}`);
+  const badge = $('wa-status-badge');
+  
+  if (data && data.instance) {
+    const state = data.instance.state;
+    if (state === 'open') {
+      waStatus = 'conectado';
+      badge.textContent = 'Conectado';
+      badge.className = 'status-badge green';
+      hide('wa-qr-container');
+      show('wa-connected-container');
+      $('btn-wa-connect').classList.add('hidden');
+    } else {
+      waStatus = 'desconectado';
+      badge.textContent = 'Desconectado';
+      badge.className = 'status-badge red';
+      hide('wa-connected-container');
+      $('btn-wa-connect').classList.remove('hidden');
+    }
+  } else {
+    // Instância pode não existir, vamos criar.
+    waStatus = 'desconectado';
+    badge.textContent = 'Desconectado';
+    badge.className = 'status-badge red';
+    hide('wa-connected-container');
+    $('btn-wa-connect').classList.remove('hidden');
+  }
+}
+
+$('btn-wa-connect').addEventListener('click', async () => {
+  $('btn-wa-connect').textContent = 'Conectando...';
+  
+  // Tentar criar instância (se já existir, dará erro, o que é ok)
+  await evoApi('/instance/create', 'POST', {
+    instanceName: INSTANCE_NAME,
+    qrcode: true,
+    integration: "WHATSAPP-BAILEYS"
+  });
+
+  const data = await evoApi(`/instance/connect/${INSTANCE_NAME}`);
+  $('btn-wa-connect').textContent = 'Conectar WhatsApp';
+
+  if (data && data.base64) {
+    show('wa-qr-container');
+    const img = new Image();
+    img.src = data.base64;
+    img.onload = () => {
+      const canvas = $('wa-qr-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+    };
+    
+    // Fica checando o status a cada 3s até conectar
+    if(waCheckInterval) clearInterval(waCheckInterval);
+    waCheckInterval = setInterval(async () => {
+      await checkWaConnection();
+      if(waStatus === 'conectado') clearInterval(waCheckInterval);
+    }, 3000);
+  } else if (data && data.instance && data.instance.state === 'open') {
+    checkWaConnection();
+  } else {
+    toast('Erro ao obter QR Code', 'error');
+  }
+});
+
+$('btn-wa-disconnect').addEventListener('click', async () => {
+  if(!confirm('Deseja desconectar esta instância do WhatsApp?')) return;
+  await evoApi(`/instance/logout/${INSTANCE_NAME}`, 'DELETE');
+  await checkWaConnection();
+  toast('WhatsApp desconectado.', 'info');
+});
+
+async function loadWaConfig() {
+  const { data, error } = await db.from('wa_config').select('*').limit(1);
+  if (!error && data && data.length > 0) {
+    waConfigData = data[0];
+    $('wa-msg-antes').value = waConfigData.msg_antes || '';
+    $('wa-msg-apos').value = waConfigData.msg_apos || '';
+    $('wa-msg-image').value = waConfigData.msg_image || '';
+    $('wa-msg-audio').value = waConfigData.msg_audio || '';
+    $('wa-auto-time').value = waConfigData.auto_time || '';
+    $('wa-auto-interval').value = waConfigData.auto_interval || '1';
+    $('wa-auto-active').checked = waConfigData.auto_active || false;
+    
+    const dAntes = (waConfigData.dias_antes || '').split(',');
+    document.querySelectorAll('.wa-cb-antes').forEach(cb => cb.checked = dAntes.includes(cb.value));
+    
+    const dDepois = (waConfigData.dias_depois || '').split(',');
+    document.querySelectorAll('.wa-cb-depois').forEach(cb => cb.checked = dDepois.includes(cb.value));
+  } else if (error && error.code === '42P01') {
+    toast('Tabela wa_config não existe. Execute o SQL de configuração.', 'error');
+  }
+}
+
+$('btn-wa-save-msg').addEventListener('click', async () => {
+  const payload = {
+    msg_antes: $('wa-msg-antes').value,
+    msg_apos: $('wa-msg-apos').value,
+    msg_image: $('wa-msg-image').value,
+    msg_audio: $('wa-msg-audio').value,
+  };
+  await saveWaConfig(payload);
+  toast('Textos salvos com sucesso!', 'success');
+});
+
+$('btn-wa-save-auto').addEventListener('click', async () => {
+  const diasAntes = Array.from(document.querySelectorAll('.wa-cb-antes:checked')).map(cb => cb.value).join(',');
+  const diasDepois = Array.from(document.querySelectorAll('.wa-cb-depois:checked')).map(cb => cb.value).join(',');
+  
+  const payload = {
+    auto_time: $('wa-auto-time').value,
+    auto_interval: $('wa-auto-interval').value,
+    auto_active: $('wa-auto-active').checked,
+    dias_antes: diasAntes,
+    dias_depois: diasDepois
+  };
+  await saveWaConfig(payload);
+  toast('Configurações de disparo salvas!', 'success');
+});
+
+async function saveWaConfig(payload) {
+  if (waConfigData && waConfigData.id) {
+    await db.from('wa_config').update(payload).eq('id', waConfigData.id);
+  } else {
+    const { data } = await db.from('wa_config').insert(payload).select();
+    if (data && data.length > 0) waConfigData = data[0];
+  }
+}
+
+function processWaMessage(template, cliente) {
+  let msg = template;
+  msg = msg.replace(/{nome}/g, cliente.nome || '');
+  msg = msg.replace(/{vencimento}/g, cliente.vencimento ? new Date(cliente.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '');
+  msg = msg.replace(/{valor}/g, parseFloat(cliente.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+  msg = msg.replace(/{plano}/g, cliente.plano || '');
+  
+  const dias = Math.abs(diasAteVencimento(cliente.vencimento));
+  msg = msg.replace(/{dias}/g, dias);
+  
+  return msg;
+}
+
+$('btn-wa-preview').addEventListener('click', () => {
+  const clienteFake = { nome: 'João Silva', vencimento: new Date().toISOString().split('T')[0], valor: '39.90', plano: 'Mensal' };
+  const antes = processWaMessage($('wa-msg-antes').value, clienteFake);
+  const apos = processWaMessage($('wa-msg-apos').value, clienteFake);
+  
+  alert(`=== ANTES ===\n${antes}\n\n=== APÓS ===\n${apos}`);
+});
+
+$('wa-manual-filter').addEventListener('change', updateWaManualCount);
+
+function updateWaManualCount() {
+  const filter = $('wa-manual-filter').value;
+  const filtered = filterWaClients(filter);
+  $('wa-manual-count').textContent = filtered.length;
+}
+
+function filterWaClients(filter) {
+  return allClientes.filter(c => {
+    if(!c.whatsapp) return false;
+    if(filter === 'todos') return true;
+    const dias = diasAteVencimento(c.vencimento);
+    if(filter === 'vencendo_hoje') return dias === 0;
+    if(filter === 'vencidos') return dias < 0;
+    return false;
+  });
+}
+
+$('btn-wa-send-now').addEventListener('click', () => {
+  if(waStatus !== 'conectado') return toast('WhatsApp não está conectado!', 'error');
+  const filter = $('wa-manual-filter').value;
+  const clients = filterWaClients(filter);
+  if(clients.length === 0) return toast('Nenhum cliente selecionado.', 'info');
+  
+  clients.forEach(c => waQueue.push(c));
+  toast(`${clients.length} mensagens enviadas imediatamente.`, 'success');
+  startWaQueue();
+});
+
+$('btn-wa-add-queue').addEventListener('click', () => {
+  if(waStatus !== 'conectado') return toast('WhatsApp não está conectado!', 'error');
+  const filter = $('wa-manual-filter').value;
+  const clients = filterWaClients(filter);
+  if(clients.length === 0) return toast('Nenhum cliente selecionado.', 'info');
+  
+  clients.forEach(c => waQueue.push(c));
+  updateWaQueueUI();
+  toast(`${clients.length} adicionados à fila.`, 'success');
+});
+
+$('btn-wa-pause-queue').addEventListener('click', () => { waIsRunning = false; $('wa-queue-status-text').textContent = 'Pausada'; $('wa-queue-status-text').style.color = 'var(--yellow)'; });
+$('btn-wa-resume-queue').addEventListener('click', () => { if(waQueue.length > 0) startWaQueue(); });
+
+function updateWaQueueUI() {
+  $('wa-queue-total').textContent = waQueue.length;
+  // Progress calc not completely accurate since we just shift items, but we can do a local counter
+}
+
+let waSentCount = 0;
+let waTotalCount = 0;
+
+async function startWaQueue() {
+  if (waIsRunning) return;
+  if (waQueue.length === 0) return;
+  waIsRunning = true;
+  waTotalCount += waQueue.length;
+  $('wa-queue-status-text').textContent = 'Rodando...';
+  $('wa-queue-status-text').style.color = '#34d399';
+
+  const interval = parseInt($('wa-auto-interval').value || 1) * 60000;
+
+  while(waQueue.length > 0 && waIsRunning) {
+    const client = waQueue.shift();
+    const isVencido = diasAteVencimento(client.vencimento) < 0;
+    const template = isVencido ? $('wa-msg-apos').value : $('wa-msg-antes').value;
+    const msg = processWaMessage(template, client);
+    
+    // Disparar
+    let phone = client.whatsapp.replace(/\D/g, '');
+    if(!phone.startsWith('55')) phone = '55' + phone;
+
+    const reqData = {
+      number: phone,
+      textMessage: { text: msg }
+    };
+    
+    // If has audio
+    const audioUrl = $('wa-msg-audio').value.trim();
+    const imageUrl = $('wa-msg-image').value.trim();
+
+    try {
+      if (imageUrl) {
+        await evoApi('/message/sendMedia/'+INSTANCE_NAME, 'POST', {
+          number: phone,
+          options: { delay: 1200 },
+          mediaMessage: { mediatype: 'image', fileName: 'imagem.jpg', caption: msg, media: imageUrl }
+        });
+      } else {
+        await evoApi('/message/sendText/'+INSTANCE_NAME, 'POST', reqData);
+      }
+      
+      if (audioUrl) {
+        await evoApi('/message/sendWhatsAppAudio/'+INSTANCE_NAME, 'POST', {
+          number: phone,
+          options: { delay: 2000 },
+          audioMessage: { audio: audioUrl }
+        });
+      }
+
+      logWaQueue(`Enviado: ${client.nome} (${phone})`);
+      waSentCount++;
+      await saveWaHistory(client.nome, phone, msg, 'Enviado');
+    } catch (e) {
+      logWaQueue(`ERRO: ${client.nome} (${phone})`);
+      await saveWaHistory(client.nome, phone, msg, 'Erro');
+    }
+
+    $('wa-queue-sent').textContent = waSentCount;
+    $('wa-queue-total').textContent = waTotalCount;
+    $('wa-queue-progress').style.width = Math.min(100, (waSentCount / waTotalCount) * 100) + '%';
+    
+    if (waQueue.length > 0 && waIsRunning) {
+      logWaQueue(`Aguardando ${interval/1000}s para o próximo...`);
+      await new Promise(r => setTimeout(r, interval));
+    }
+  }
+
+  waIsRunning = false;
+  if(waQueue.length === 0) {
+    $('wa-queue-status-text').textContent = 'Concluído';
+    waSentCount = 0; waTotalCount = 0;
+  } else {
+    $('wa-queue-status-text').textContent = 'Pausada';
+  }
+}
+
+function logWaQueue(txt) {
+  const logDiv = $('wa-queue-log');
+  const d = new Date().toLocaleTimeString('pt-BR');
+  logDiv.innerHTML += `<div><span style="color:var(--purple-light)">[${d}]</span> ${txt}</div>`;
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+async function saveWaHistory(cliente, numero, mensagem, status) {
+  await db.from('wa_historico').insert({
+    cliente, numero, mensagem, status
+  });
+  await loadWaHistory();
+}
+
+async function loadWaHistory() {
+  const { data } = await db.from('wa_historico').select('*').order('created_at', { ascending: false }).limit(50);
+  const list = data || [];
+  const tbody = $('tbody-wa-history');
+  if (list.length === 0) {
+    tbody.innerHTML = '';
+    show('wa-history-empty');
+    return;
+  }
+  hide('wa-history-empty');
+  tbody.innerHTML = list.map(h => {
+    const badge = h.status === 'Enviado' ? 'badge-ativo' : 'badge-vencido';
+    const d = new Date(h.created_at).toLocaleString('pt-BR');
+    return `<tr>
+      <td><strong>${h.cliente}</strong></td>
+      <td>${h.numero}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${h.mensagem}">${h.mensagem}</td>
+      <td>${d}</td>
+      <td><span class="badge ${badge}">${h.status}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+$('wa-history-date').addEventListener('change', filterWaHistoryTable);
+$('wa-history-status').addEventListener('change', filterWaHistoryTable);
+
+function filterWaHistoryTable() {
+  // Simple frontend filter
+  const trs = document.querySelectorAll('#tbody-wa-history tr');
+  const dFilter = $('wa-history-date').value;
+  const sFilter = $('wa-history-status').value;
+  let visibleCount = 0;
+
+  trs.forEach(tr => {
+    const dataTxt = tr.children[3].textContent; // Data
+    const statusTxt = tr.children[4].textContent.trim(); // Status
+    
+    let showRow = true;
+    if(sFilter && statusTxt !== sFilter) showRow = false;
+    
+    if(dFilter) {
+      const dFmt = dFilter.split('-').reverse().join('/'); // YYYY-MM-DD -> DD/MM/YYYY
+      if(!dataTxt.includes(dFmt)) showRow = false;
+    }
+
+    if(showRow) { tr.style.display = ''; visibleCount++; }
+    else tr.style.display = 'none';
+  });
+
+  if(visibleCount === 0) show('wa-history-empty');
+  else hide('wa-history-empty');
+}
+
