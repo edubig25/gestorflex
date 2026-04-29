@@ -507,12 +507,18 @@
     <div class="modal-header"><h3 id="modal-plano-titulo">Novo Plano</h3><button class="modal-close" id="modal-plano-close">✕</button></div>
     <form id="form-plano" class="modal-form">
       <input type="hidden" id="pl-id">
-      <div class="field-group"><label>Nome do Plano *</label><input type="text" id="pl-nome" placeholder="Ex: Plano Mensal Premium" required></div>
-      <div class="form-row">
-        <div class="field-group"><label>Valor (R$) *</label><input type="number" id="pl-valor" placeholder="0.00" step="0.01" min="0" required></div>
-        <div class="field-group"><label>Periodicidade</label>
-          <select id="pl-periodicidade"><option value="Mensal">Mensal</option><option value="Trimestral">Trimestral</option><option value="Semestral">Semestral</option><option value="Anual">Anual</option><option value="Semanal">Semanal</option></select>
-        </div>
+      <div class="field-group"><label>Nome do Plano *</label><input type="text" id="pl-nome" placeholder="Digite um nome" required style="border-radius:24px; padding-left:16px;"></div>
+      <div class="field-group"><label>Valor do plano *</label><input type="number" id="pl-valor" placeholder="Valor do plano" step="0.01" min="0" required style="border-radius:24px; padding-left:16px;"></div>
+      <div class="field-group"><label>Custo por assinante (opcional)</label><input type="number" id="pl-custo" placeholder="Custo por assinante (opcional)" step="0.01" min="0" style="border-radius:24px; padding-left:16px;"></div>
+      <div class="field-group"><label>Periodicidade</label>
+        <select id="pl-periodicidade" style="border-radius:24px; padding-left:16px;">
+          <option value="Semanal">Semanal</option>
+          <option value="Mensal" selected>Mensal</option>
+          <option value="Bimestral">Bimestral</option>
+          <option value="Trimestral">Trimestral</option>
+          <option value="Semestral">Semestral</option>
+          <option value="Anual">Anual</option>
+        </select>
       </div>
       <div id="plano-error" class="error-msg hidden"></div>
       <div class="modal-actions">

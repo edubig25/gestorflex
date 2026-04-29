@@ -143,9 +143,11 @@ CREATE TABLE IF NOT EXISTS planos (
   id bigserial primary key,
   nome text not null,
   valor numeric default 0,
+  custo numeric default 0,
   periodicidade text default 'Mensal',
   created_at timestamptz default now()
 );
+ALTER TABLE planos ADD COLUMN IF NOT EXISTS custo numeric default 0;
 ALTER TABLE planos DISABLE ROW LEVEL SECURITY;
 
 -- Tabela WhatsApp Config
@@ -932,6 +934,7 @@ function openEditPlano(id) {
   $('pl-id').value = p.id;
   $('pl-nome').value = p.nome || '';
   $('pl-valor').value = p.valor || '';
+  $('pl-custo').value = p.custo || '';
   $('pl-periodicidade').value = p.periodicidade || 'Mensal';
   hide('plano-error');
   show('modal-plano');
@@ -940,7 +943,12 @@ function openEditPlano(id) {
 $('form-plano').addEventListener('submit', async e => {
   e.preventDefault();
   const id = $('pl-id').value;
-  const payload = { nome: $('pl-nome').value.trim(), valor: parseFloat($('pl-valor').value)||0, periodicidade: $('pl-periodicidade').value };
+  const payload = { 
+    nome: $('pl-nome').value.trim(), 
+    valor: parseFloat($('pl-valor').value)||0, 
+    custo: parseFloat($('pl-custo').value)||0,
+    periodicidade: $('pl-periodicidade').value 
+  };
   if(!payload.nome) { $('plano-error').textContent='Nome obrigatório.'; show('plano-error'); return; }
   let error;
   if(id) { ({error} = await db.from('planos').update(payload).eq('id',id)); }
