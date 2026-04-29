@@ -503,15 +503,29 @@
 
 <!-- MODAL PLANO -->
 <div id="modal-plano" class="modal-overlay hidden">
-  <div class="modal-box small">
-    <div class="modal-header"><h3 id="modal-plano-titulo">Novo Plano</h3><button class="modal-close" id="modal-plano-close">✕</button></div>
+  <div class="modal-box small" style="background-color: #071C21; border: 1px solid #0F2D35; border-radius: 8px;">
+    <div class="modal-header" style="border-bottom: 1px solid #143F4A; padding-bottom: 15px; margin-bottom: 20px;">
+      <h3 id="modal-plano-titulo" style="color: #fff; font-weight: 500; font-size: 1.1rem;">Criar uma novo plano</h3>
+      <button class="modal-close" id="modal-plano-close" style="color: #6c757d;">✕</button>
+    </div>
     <form id="form-plano" class="modal-form">
       <input type="hidden" id="pl-id">
-      <div class="field-group"><label>Nome do Plano *</label><input type="text" id="pl-nome" placeholder="Digite um nome" required style="border-radius:24px; padding-left:16px;"></div>
-      <div class="field-group"><label>Valor do plano *</label><input type="number" id="pl-valor" placeholder="Valor do plano" step="0.01" min="0" required style="border-radius:24px; padding-left:16px;"></div>
-      <div class="field-group"><label>Custo por assinante (opcional)</label><input type="number" id="pl-custo" placeholder="Custo por assinante (opcional)" step="0.01" min="0" style="border-radius:24px; padding-left:16px;"></div>
-      <div class="field-group"><label>Periodicidade</label>
-        <select id="pl-periodicidade" style="border-radius:24px; padding-left:16px;">
+      
+      <div class="field-group" style="margin-bottom: 15px;">
+        <input type="text" id="pl-nome" placeholder="Digite um nome" required class="cobrei-input">
+      </div>
+      
+      <div class="field-group" style="margin-bottom: 15px;">
+        <input type="number" id="pl-valor" placeholder="Valor do plano" step="0.01" min="0" required class="cobrei-input">
+      </div>
+      
+      <div class="field-group" style="margin-bottom: 20px;">
+        <input type="number" id="pl-custo" placeholder="Custo por assinante (opcional)" step="0.01" min="0" class="cobrei-input">
+      </div>
+      
+      <p style="color: #a0aab2; font-size: 0.85rem; margin-bottom: 8px;">Template de venda (opcional)</p>
+      <div class="field-group" style="margin-bottom: 15px;">
+        <select id="pl-periodicidade" class="cobrei-input">
           <option value="Semanal">Semanal</option>
           <option value="Mensal" selected>Mensal</option>
           <option value="Bimestral">Bimestral</option>
@@ -520,10 +534,12 @@
           <option value="Anual">Anual</option>
         </select>
       </div>
+
       <div id="plano-error" class="error-msg hidden"></div>
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" id="btn-cancelar-plano">Cancelar</button>
-        <button type="submit" class="btn-primary">Salvar Plano</button>
+      
+      <div class="modal-actions" style="margin-top: 30px; border-top: 1px solid #143F4A; padding-top: 15px; justify-content: flex-end;">
+        <button type="button" id="btn-cancelar-plano" style="background: #8e8e8e; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 0.9rem;">Fechar</button>
+        <button type="submit" style="background: #009688; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 0.9rem;">Adicionar</button>
       </div>
     </form>
   </div>
