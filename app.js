@@ -1524,3 +1524,7 @@ function filterWaHistoryTable() {
   else hide('wa-history-empty');
 }
 
+// Inicia o app ao final de todos os scripts
+window.onload = () => {
+  boot();
+};
