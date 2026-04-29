@@ -15,7 +15,13 @@ let db;
 try {
   const SUPA_URL = 'https://onnqatmndtjafyhtjsjb.supabase.co';
   const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubnFhdG1uZHRqYWZ5aHRqc2piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTcwNjYsImV4cCI6MjA5Mjg5MzA2Nn0.1TBz5189kyWwQLh0FnBtMwZu_hWmsQ5OPwWMVUlNzHo';
-  db = supabase.createClient(SUPA_URL, SUPA_KEY);
+  
+  if (typeof window.supabase !== 'undefined') {
+    db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    console.log('Supabase initialized successfully');
+  } else {
+    console.error('ERRO: Biblioteca Supabase não encontrada no carregamento.');
+  }
 } catch (e) {
   console.error('Supabase init error:', e);
 }
@@ -254,42 +260,62 @@ $('setup-form').addEventListener('submit', async e => {
 // === LOGIN ===
 $('login-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const email = $('login-email').value.trim();
-  const senha = $('login-senha').value;
-  const err = $('login-error');
-  hide('login-error');
+  try {
+    const email = $('login-email').value.trim();
+    const senha = $('login-senha').value;
+    const err = $('login-error');
+    hide('login-error');
 
-  // Supabase Auth nativo para login
-  const { data: authData, error: authErr } = await db.auth.signInWithPassword({
-    email: email,
-    password: senha
-  });
+    if (!db) {
+      toast('Sistema de banco de dados não carregou. Recarregue a página.', 'error');
+      return;
+    }
 
-  if (authErr || !authData.user) {
-    err.textContent = 'E-mail ou senha incorretos.';
-    show('login-error');
-    return;
-  }
+    const btn = e.submitter || $('login-form').querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+    btn.textContent = 'Entrando...';
+    btn.disabled = true;
 
-  // Busca dados adicionais do usuário
-  const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', authData.user.id).single();
-  
-  if (!customUser) {
-    err.textContent = 'Usuário não encontrado na base de dados.';
-    show('login-error');
-    return;
-  }
+    // Supabase Auth nativo para login
+    const { data: authData, error: authErr } = await db.auth.signInWithPassword({
+      email: email,
+      password: senha
+    });
 
-  const user = { ...authData.user, ...customUser };
+    if (authErr || !authData.user) {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      err.textContent = 'E-mail ou senha incorretos.';
+      show('login-error');
+      return;
+    }
 
-  if (user.two_factor_enabled) {
-    tempLoginUser = user;
-    hide('login-screen');
-    show('twofa-screen');
-    $('twofa-code').value = '';
-    $('twofa-code').focus();
-  } else {
-    finishLogin(user);
+    console.log('Auth success, fetching user data...');
+    // Busca dados adicionais do usuário
+    const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', authData.user.id).single();
+    
+    if (!customUser) {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      err.textContent = 'Usuário não encontrado na base de dados.';
+      show('login-error');
+      return;
+    }
+
+    const user = { ...authData.user, ...customUser };
+
+    if (user.two_factor_enabled) {
+      tempLoginUser = user;
+      hide('login-screen');
+      show('twofa-screen');
+      $('twofa-code').value = '';
+      $('twofa-code').focus();
+    } else {
+      finishLogin(user);
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    toast('Erro inesperado ao logar. Tente novamente.', 'error');
   }
 });
 
@@ -430,19 +456,25 @@ $('form-reset').addEventListener('submit', async e => {
 
 // === ENTER APP ===
 function enterApp() {
-  show('app');
-  $('sidebar-nome').textContent = currentUser.nome || currentUser.email;
-  $('sidebar-avatar').textContent = (currentUser.nome || currentUser.email).charAt(0).toUpperCase();
-  loadPlanos();
-  loadDashboard();
-  populateConfig();
-  // MAC/KEY toggle
-  document.querySelectorAll('input[name="cl-has-mac"]').forEach(r => {
-    r.addEventListener('change', () => {
-      if($('cl-has-mac-sim').checked) show('mac-key-fields');
-      else { hide('mac-key-fields'); $('cl-mac').value=''; $('cl-key').value=''; }
+  try {
+    console.log('Entering App Layout...');
+    show('app');
+    $('sidebar-nome').textContent = currentUser.nome || currentUser.email;
+    $('sidebar-avatar').textContent = (currentUser.nome || currentUser.email).charAt(0).toUpperCase();
+    loadPlanos();
+    loadDashboard();
+    populateConfig();
+    // MAC/KEY toggle
+    document.querySelectorAll('input[name="cl-has-mac"]').forEach(r => {
+      r.addEventListener('change', () => {
+        if($('cl-has-mac-sim').checked) show('mac-key-fields');
+        else { hide('mac-key-fields'); $('cl-mac').value=''; $('cl-key').value=''; }
+      });
     });
-  });
+  } catch (err) {
+    console.error('Error entering app:', err);
+    toast('Erro ao carregar o dashboard. Recarregue a página.', 'error');
+  }
 }
 
 // === LOGOUT ===
