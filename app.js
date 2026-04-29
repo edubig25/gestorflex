@@ -718,6 +718,9 @@ async function renovar(id) {
 }
 
 // === FINANCEIRO ===
+let chartFinFluxo = null;
+let chartFinStatus = null;
+let chartFinPlano = null;
 let chartCaptacao = null;
 
 async function loadFinanceiro() {
