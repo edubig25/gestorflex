@@ -210,14 +210,15 @@ input,select,textarea{font-family:'Inter',sans-serif;outline:none}
   .captacao-grid{grid-template-columns:1fr}
 }
 @media(max-width:700px){
+  body { overflow-x: hidden; }
   .sidebar{transform:translateX(-100%);z-index:300}
   .sidebar.open{transform:translateX(0);box-shadow:4px 0 40px rgba(0,0,0,.6)}
-  .main-content{margin-left:0}
+  .main-content{margin-left:0; width: 100%; max-width: 100vw; overflow-x: hidden;}
   .app-footer{margin-left:0}
   .menu-toggle{display:block}
   .metrics-grid{grid-template-columns:1fr 1fr}
   .form-row{grid-template-columns:1fr}
-  .page{padding:20px 14px 100px}
+  .page{padding:20px 14px 100px; width: 100%; box-sizing: border-box; overflow-x: hidden;}
   .topbar{padding:0 14px}
   .table-actions{flex-direction:column;gap:4px}
   .action-btn{width:100%;text-align:center;padding:8px}
@@ -225,8 +226,8 @@ input,select,textarea{font-family:'Inter',sans-serif;outline:none}
   .page-header{flex-direction:column;align-items:flex-start;gap:10px}
   .page-header > div{width:100%}
   .filters-bar{flex-direction:column}
-  .filter-select,.search-input{width:100%}
-  .table-wrap{border-radius:10px}
+  .filter-select,.search-input{width:100%; box-sizing: border-box;}
+  .table-wrap{border-radius:10px; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;}
   .data-table{font-size:.8rem}
   .data-table td,.data-table th{padding:10px 10px}
   .fin-top-cards{grid-template-columns:1fr 1fr}
