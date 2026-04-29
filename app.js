@@ -57,11 +57,14 @@ function planoMeses(plano) {
 
 // === BOOT ===
 async function boot() {
-  const { data: { session }, error: sessionErr } = await db.auth.getSession();
-  
-  // Verifica se o banco já foi configurado checando a tabela "usuarios" (se existe auth_id)
-  const { data: usersData, error: usersErr } = await db.from('usuarios').select('id, auth_id').limit(1);
-  hide('splash');
+  try {
+    // Esconde o splash após um pequeno delay para garantir que o CSS carregou
+    setTimeout(() => hide('splash'), 500);
+
+    const { data: { session }, error: sessionErr } = await db.auth.getSession();
+    
+    // Verifica se o banco já foi configurado checando a tabela "usuarios"
+    const { data: usersData, error: usersErr } = await db.from('usuarios').select('id, auth_id').limit(1);
 
   if (usersErr && (usersErr.code === '42P01' || usersErr.message?.includes('does not exist') || usersErr.message?.includes('auth_id'))) {
     showDbSetup();
@@ -92,6 +95,12 @@ async function boot() {
   }
 
   show('login-screen');
+  } catch (err) {
+    console.error('Boot error:', err);
+    hide('splash');
+    show('login-screen');
+    toast('Erro ao iniciar. Verifique sua conexão.', 'error');
+  }
 }
 
 function showDbSetup() {
