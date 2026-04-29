@@ -92,7 +92,7 @@
       <a href="#" class="nav-item" data-page="clientes"><span class="nav-icon">👥</span><span class="nav-label">Clientes</span></a>
       <a href="#" class="nav-item" data-page="financeiro"><span class="nav-icon">💰</span><span class="nav-label">Financeiro</span></a>
       <a href="#" class="nav-item" data-page="captacao"><span class="nav-icon">📡</span><span class="nav-label">Captação</span></a>
-      <a href="#" class="nav-item" data-page="servidores"><span class="nav-icon">🖥️</span><span class="nav-label">Servidores</span></a>
+      <a href="#" class="nav-item" data-page="planos"><span class="nav-icon">🏷️</span><span class="nav-label">Planos</span></a>
       <a href="#" class="nav-item" data-page="whatsapp"><span class="nav-icon" style="color: #25D366;">💬</span><span class="nav-label">WhatsApp</span></a>
       <a href="#" class="nav-item" data-page="configuracoes"><span class="nav-icon">⚙️</span><span class="nav-label">Configurações</span></a>
     </nav>
@@ -140,21 +140,74 @@
         </select>
       </div>
       <div class="table-wrap">
-        <table class="data-table"><thead><tr><th>Nome</th><th>WhatsApp</th><th>Plano</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Servidor</th><th>Origem</th><th>Ações</th></tr></thead><tbody id="tbody-clientes"></tbody></table>
+        <table class="data-table"><thead><tr><th>Nome</th><th>WhatsApp</th><th>Plano</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Origem</th><th>Ações</th></tr></thead><tbody id="tbody-clientes"></tbody></table>
         <div id="clientes-empty" class="empty-state hidden"><span>👥</span><p>Nenhum cliente encontrado.</p></div>
       </div>
     </div>
 
     <!-- FINANCEIRO -->
     <div id="page-financeiro" class="page">
-      <div class="page-header"><h1>Financeiro</h1><p>Controle de receitas e vencimentos</p></div>
-      <div class="metrics-grid">
-        <div class="metric-card green"><div class="metric-icon">💵</div><div class="metric-info"><span class="metric-label">Recebido no Mês</span><span class="metric-value" id="fin-recebido">—</span></div></div>
-        <div class="metric-card yellow"><div class="metric-icon">📋</div><div class="metric-info"><span class="metric-label">Em Aberto</span><span class="metric-value" id="fin-aberto">—</span></div></div>
+      <div class="page-header">
+        <div><h1>Financeiro</h1><p>Visão completa das suas finanças</p></div>
+        <select id="fin-period" class="filter-select" style="width:auto;">
+          <option value="1">Este Mês</option>
+          <option value="3">Últimos 3 Meses</option>
+          <option value="6" selected>Últimos 6 Meses</option>
+          <option value="12">Este Ano</option>
+        </select>
       </div>
-      <div class="dash-grid">
-        <div class="card chart-card"><div class="card-header"><h3>Receita — Últimos 6 Meses</h3></div><canvas id="chart-fin-receita" height="220"></canvas></div>
-        <div class="card"><div class="card-header"><h3>📅 Vencimentos da Semana</h3></div><div id="fin-vencimentos" class="vencendo-list"></div></div>
+      <div class="fin-top-cards">
+        <div class="fin-card-big">
+          <div class="fin-card-icon" style="background:rgba(124,58,237,.2);color:var(--purple-light);">💰</div>
+          <div class="fin-card-info"><span class="fin-card-label">Receita do Mês</span><span class="fin-card-value" id="fin-receita-mes">—</span></div>
+        </div>
+        <div class="fin-card-big">
+          <div class="fin-card-icon" style="background:rgba(16,185,129,.2);color:#34d399;">↑</div>
+          <div class="fin-card-info"><span class="fin-card-label">Clientes Ativos</span><span class="fin-card-value" id="fin-ativos-count">—</span></div>
+        </div>
+        <div class="fin-card-big">
+          <div class="fin-card-icon" style="background:rgba(245,158,11,.2);color:#fbbf24;">📋</div>
+          <div class="fin-card-info"><span class="fin-card-label">Em Aberto</span><span class="fin-card-value" id="fin-em-aberto">—</span></div>
+        </div>
+        <div class="fin-card-big">
+          <div class="fin-card-icon" style="background:rgba(239,68,68,.2);color:#f87171;">⚠️</div>
+          <div class="fin-card-info"><span class="fin-card-label">Clientes Vencidos</span><span class="fin-card-value" id="fin-vencidos-count">—</span></div>
+        </div>
+      </div>
+      <div class="dash-grid" style="grid-template-columns:1.7fr 1fr;margin-top:20px;">
+        <div class="card chart-card">
+          <div class="card-header">
+            <h3>📈 Receita vs Inadimplência — Período</h3>
+            <div style="display:flex;align-items:center;gap:12px;font-size:.78rem;color:var(--text-muted);">
+              <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#10B981;border-radius:50%;display:inline-block;"></span>Receita</span>
+              <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#EF4444;border-radius:50%;display:inline-block;"></span>Inadimplente</span>
+            </div>
+          </div>
+          <canvas id="chart-fin-fluxo" height="220"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>🍩 Situação dos Clientes</h3></div>
+          <div class="donut-wrap"><canvas id="chart-fin-status" width="200" height="200"></canvas></div>
+          <div id="fin-status-legend" class="fin-legend"></div>
+        </div>
+      </div>
+      <div class="dash-grid" style="grid-template-columns:1fr 1fr;margin-top:20px;">
+        <div class="card">
+          <div class="card-header"><h3>🏷️ Receita por Plano</h3></div>
+          <canvas id="chart-fin-plano" height="200"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>📅 Vencimentos da Semana</h3></div>
+          <div id="fin-vencimentos" class="vencendo-list"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header"><h3>🔴 Clientes Vencidos / Inadimplentes</h3></div>
+        <div class="table-wrap">
+          <table class="data-table"><thead><tr><th>Nome</th><th>WhatsApp</th><th>Plano</th><th>Valor</th><th>Vencimento</th><th>Dias em atraso</th></tr></thead>
+          <tbody id="tbody-fin-vencidos"></tbody></table>
+          <div id="fin-vencidos-empty" class="empty-state hidden"><span>✅</span><p>Nenhum cliente vencido.</p></div>
+        </div>
       </div>
     </div>
 
@@ -167,12 +220,18 @@
       </div>
     </div>
 
-    <!-- SERVIDORES -->
-    <div id="page-servidores" class="page">
-      <div class="page-header"><h1>Servidores</h1><button class="btn-primary" id="btn-add-servidor">+ Adicionar Servidor</button></div>
+    <!-- PLANOS -->
+    <div id="page-planos" class="page">
+      <div class="page-header"><h1>Planos</h1><button class="btn-primary" id="btn-add-plano">+ Novo Plano</button></div>
+      <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
+        <div class="metric-card"><div class="metric-icon">🏷️</div><div class="metric-info"><span class="metric-label">Total de Planos</span><span class="metric-value" id="pl-total">—</span></div></div>
+        <div class="metric-card green"><div class="metric-icon">💵</div><div class="metric-info"><span class="metric-label">Ticket Médio</span><span class="metric-value" id="pl-ticket">—</span></div></div>
+        <div class="metric-card purple"><div class="metric-icon">👥</div><div class="metric-info"><span class="metric-label">Clientes Vinculados</span><span class="metric-value" id="pl-clientes">—</span></div></div>
+        <div class="metric-card yellow"><div class="metric-icon">📈</div><div class="metric-info"><span class="metric-label">Receita Potencial/Mês</span><span class="metric-value" id="pl-receita">—</span></div></div>
+      </div>
       <div class="table-wrap">
-        <table class="data-table"><thead><tr><th>Nome</th><th>URL / Host</th><th>Porta</th><th>Usuário</th><th>Painel</th><th>Status</th><th>Ações</th></tr></thead><tbody id="tbody-servidores"></tbody></table>
-        <div id="servidores-empty" class="empty-state hidden"><span>🖥️</span><p>Nenhum servidor cadastrado.</p></div>
+        <table class="data-table"><thead><tr><th>#</th><th>Nome do Plano</th><th>Valor</th><th>Periodicidade</th><th>Clientes</th><th>Ações</th></tr></thead><tbody id="tbody-planos"></tbody></table>
+        <div id="planos-empty" class="empty-state hidden"><span>🏷️</span><p>Nenhum plano cadastrado.</p></div>
       </div>
     </div>
 
@@ -406,7 +465,7 @@
       </div>
       <div class="form-row">
         <div class="field-group"><label>Plano *</label>
-          <select id="cl-plano" required><option value="">Selecione o plano</option><option value="Mensal">Mensal</option><option value="Trimestral">Trimestral</option><option value="Semestral">Semestral</option><option value="Anual">Anual</option></select>
+          <select id="cl-plano" required><option value="">Selecione o plano</option></select>
         </div>
         <div class="field-group"><label>Valor (R$)</label><input type="number" id="cl-valor" placeholder="0.00" step="0.01" min="0"></div>
       </div>
@@ -417,10 +476,21 @@
         </div>
       </div>
       <div class="form-row">
-        <div class="field-group"><label>🖥️ Servidor</label><select id="cl-servidor"><option value="">Nenhum servidor</option></select></div>
         <div class="field-group"><label>Origem</label>
           <select id="cl-origem"><option value="Tráfego Pago Meta Ads">Meta Ads</option><option value="Tráfego Pago Google Ads">Google Ads</option><option value="Indicação">Indicação</option><option value="Orgânico WhatsApp">WhatsApp Orgânico</option><option value="Orgânico Instagram">Instagram Orgânico</option><option value="Outro">Outro</option></select>
         </div>
+        <div class="field-group"><label>📱 Nome do Aplicativo</label><input type="text" id="cl-app-nome" placeholder="Ex: FLIX PRO, STB, etc."></div>
+      </div>
+      <div class="field-group mac-key-toggle-wrap">
+        <label>O aplicativo possui MAC e KEY?</label>
+        <div style="display:flex;gap:20px;margin-top:8px;">
+          <label class="cb-label"><input type="radio" name="cl-has-mac" id="cl-has-mac-sim" value="sim"> Sim</label>
+          <label class="cb-label"><input type="radio" name="cl-has-mac" id="cl-has-mac-nao" value="nao" checked> Não</label>
+        </div>
+      </div>
+      <div id="mac-key-fields" class="form-row hidden">
+        <div class="field-group"><label>MAC Address</label><input type="text" id="cl-mac" placeholder="00:1A:2B:3C:4D:5E"></div>
+        <div class="field-group"><label>KEY / Chave</label><input type="text" id="cl-key" placeholder="Chave de ativação"></div>
       </div>
       <div id="form-error" class="error-msg hidden"></div>
       <div class="modal-actions">
@@ -431,29 +501,23 @@
   </div>
 </div>
 
-<!-- MODAL SERVIDOR -->
-<div id="modal-servidor" class="modal-overlay hidden">
-  <div class="modal-box">
-    <div class="modal-header"><h3 id="modal-srv-titulo">Adicionar Servidor</h3><button class="modal-close" id="modal-srv-close">✕</button></div>
-    <form id="form-servidor" class="modal-form">
-      <input type="hidden" id="srv-id">
+<!-- MODAL PLANO -->
+<div id="modal-plano" class="modal-overlay hidden">
+  <div class="modal-box small">
+    <div class="modal-header"><h3 id="modal-plano-titulo">Novo Plano</h3><button class="modal-close" id="modal-plano-close">✕</button></div>
+    <form id="form-plano" class="modal-form">
+      <input type="hidden" id="pl-id">
+      <div class="field-group"><label>Nome do Plano *</label><input type="text" id="pl-nome" placeholder="Ex: Plano Mensal Premium" required></div>
       <div class="form-row">
-        <div class="field-group"><label>Nome do Servidor *</label><input type="text" id="srv-nome" placeholder="Ex: Servidor Principal" required></div>
-        <div class="field-group"><label>Status</label><select id="srv-status"><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select></div>
+        <div class="field-group"><label>Valor (R$) *</label><input type="number" id="pl-valor" placeholder="0.00" step="0.01" min="0" required></div>
+        <div class="field-group"><label>Periodicidade</label>
+          <select id="pl-periodicidade"><option value="Mensal">Mensal</option><option value="Trimestral">Trimestral</option><option value="Semestral">Semestral</option><option value="Anual">Anual</option><option value="Semanal">Semanal</option></select>
+        </div>
       </div>
-      <div class="form-row">
-        <div class="field-group"><label>URL / Host</label><input type="text" id="srv-url" placeholder="http://servidor.com ou IP"></div>
-        <div class="field-group"><label>Porta</label><input type="text" id="srv-porta" placeholder="8080"></div>
-      </div>
-      <div class="form-row">
-        <div class="field-group"><label>Usuário do Painel</label><input type="text" id="srv-usuario" placeholder="admin"></div>
-        <div class="field-group"><label>Senha do Painel</label><input type="password" id="srv-senha" placeholder="••••••••"></div>
-      </div>
-      <div class="field-group"><label>URL do Painel</label><input type="text" id="srv-painel" placeholder="http://painel.servidor.com"></div>
-      <div id="srv-error" class="error-msg hidden"></div>
+      <div id="plano-error" class="error-msg hidden"></div>
       <div class="modal-actions">
-        <button type="button" class="btn-secondary" id="btn-cancelar-srv">Cancelar</button>
-        <button type="submit" class="btn-primary">Salvar</button>
+        <button type="button" class="btn-secondary" id="btn-cancelar-plano">Cancelar</button>
+        <button type="submit" class="btn-primary">Salvar Plano</button>
       </div>
     </form>
   </div>

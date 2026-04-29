@@ -7,10 +7,11 @@ const db = createClient(SUPA_URL, SUPA_KEY);
 // === STATE ===
 let currentUser = null;
 let allClientes = [];
-let allServidores = [];
+let allPlanos = [];
 let chartReceita = null;
-let chartFinReceita = null;
-let chartCaptacao = null;
+let chartFinFluxo = null;
+let chartFinStatus = null;
+let chartFinPlano = null;
 let deleteTargetId = null;
 let deleteType = null;
 let tempLoginUser = null; 
@@ -132,32 +133,35 @@ CREATE TABLE IF NOT EXISTS servidores (
 ALTER TABLE servidores DISABLE ROW LEVEL SECURITY;
 
 -- Adiciona coluna em clientes
-ALTER TABLE clientes ADD COLUMN IF NOT EXISTS servidor_id bigint references servidores(id) on delete set null;
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS servidor_id bigint;
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS app_nome text;
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS mac_address text;
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS app_key text;
+
+-- Tabela de Planos
+CREATE TABLE IF NOT EXISTS planos (
+  id bigserial primary key,
+  nome text not null,
+  valor numeric default 0,
+  periodicidade text default 'Mensal',
+  created_at timestamptz default now()
+);
+ALTER TABLE planos DISABLE ROW LEVEL SECURITY;
 
 -- Tabela WhatsApp Config
 CREATE TABLE IF NOT EXISTS wa_config (
   id bigserial primary key,
-  msg_antes text,
-  msg_apos text,
-  msg_image text,
-  msg_audio text,
-  auto_time text,
-  dias_antes text,
-  dias_depois text,
-  auto_interval text,
-  auto_active boolean default false,
+  msg_antes text, msg_apos text, msg_image text, msg_audio text,
+  auto_time text, dias_antes text, dias_depois text,
+  auto_interval text, auto_active boolean default false,
   created_at timestamptz default now()
 );
 ALTER TABLE wa_config DISABLE ROW LEVEL SECURITY;
 
 -- Tabela WhatsApp Historico
 CREATE TABLE IF NOT EXISTS wa_historico (
-  id bigserial primary key,
-  cliente text,
-  numero text,
-  mensagem text,
-  status text,
-  created_at timestamptz default now()
+  id bigserial primary key, cliente text, numero text,
+  mensagem text, status text, created_at timestamptz default now()
 );
 ALTER TABLE wa_historico DISABLE ROW LEVEL SECURITY;
 </pre>
@@ -402,9 +406,16 @@ function enterApp() {
   show('app');
   $('sidebar-nome').textContent = currentUser.nome || currentUser.email;
   $('sidebar-avatar').textContent = (currentUser.nome || currentUser.email).charAt(0).toUpperCase();
-  loadServidores();
+  loadPlanos();
   loadDashboard();
   populateConfig();
+  // MAC/KEY toggle
+  document.querySelectorAll('input[name="cl-has-mac"]').forEach(r => {
+    r.addEventListener('change', () => {
+      if($('cl-has-mac-sim').checked) show('mac-key-fields');
+      else { hide('mac-key-fields'); $('cl-mac').value=''; $('cl-key').value=''; }
+    });
+  });
 }
 
 // === LOGOUT ===
@@ -432,12 +443,12 @@ document.querySelectorAll('.nav-item').forEach(item => {
 function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
-  const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', servidores: 'Servidores', whatsapp: 'WhatsApp', configuracoes: 'Configurações' };
+  const titles = { dashboard:'Dashboard', clientes:'Clientes', financeiro:'Financeiro', captacao:'Captação', planos:'Planos', whatsapp:'WhatsApp', configuracoes:'Configurações' };
   $('topbar-title').textContent = titles[page] || '';
   if (page === 'clientes') loadClientes();
   if (page === 'financeiro') loadFinanceiro();
   if (page === 'captacao') loadCaptacao();
-  if (page === 'servidores') loadServidoresPage();
+  if (page === 'planos') loadPlanosPage();
   if (page === 'whatsapp') loadWhatsApp();
   if (page === 'configuracoes') populateConfig();
 }
@@ -577,16 +588,15 @@ function renderTabela(list) {
   tbody.innerHTML = list.map(c => {
     const badgeClass = { Ativo: 'badge-ativo', Vencido: 'badge-vencido', Pendente: 'badge-pendente' }[c.status] || 'badge-pendente';
     const dataFmt = c.vencimento ? new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
-    const srv = c.servidores ? c.servidores.nome : '—';
+    const macBadge = c.mac_address ? `<span class="mac-badge">MAC</span>` : '';
     return `<tr>
       <td><strong>${c.nome}</strong></td>
       <td>${c.whatsapp || '—'}</td>
-      <td>${c.plano || '—'}</td>
+      <td>${c.plano || '—'} ${macBadge}</td>
       <td>${fmt(c.valor)}</td>
       <td>${dataFmt}</td>
       <td><span class="badge ${badgeClass}">${c.status}</span></td>
-      <td><span class="badge-servidor">${srv}</span></td>
-      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis">${c.origem || '—'}</td>
+      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${c.origem || '—'}</td>
       <td>
         <div class="table-actions">
           <button class="action-btn action-edit" onclick="openEdit(${c.id})">Editar</button>
@@ -622,9 +632,11 @@ function openAddModal() {
   $('form-cliente').reset();
   $('cl-id').value = '';
   hide('form-error');
+  hide('mac-key-fields');
+  $('cl-has-mac-nao').checked = true;
   const hoje = new Date();
   $('cl-vencimento').value = addMeses(hoje.toISOString().split('T')[0], 1);
-  updateSelectServidores();
+  updateSelectPlanos();
   show('modal-cliente');
 }
 
@@ -635,13 +647,18 @@ function openEdit(id) {
   $('cl-id').value = c.id;
   $('cl-nome').value = c.nome || '';
   $('cl-whatsapp').value = c.whatsapp || '';
-  $('cl-plano').value = c.plano || '';
   $('cl-valor').value = c.valor || '';
   $('cl-vencimento').value = c.vencimento || '';
   $('cl-status').value = c.status || 'Ativo';
   $('cl-origem').value = c.origem || '';
-  updateSelectServidores();
-  $('cl-servidor').value = c.servidor_id || '';
+  $('cl-app-nome').value = c.app_nome || '';
+  $('cl-mac').value = c.mac_address || '';
+  $('cl-key').value = c.app_key || '';
+  if (c.mac_address || c.app_key) { $('cl-has-mac-sim').checked = true; show('mac-key-fields'); }
+  else { $('cl-has-mac-nao').checked = true; hide('mac-key-fields'); }
+  updateSelectPlanos();
+  // set plano after populating
+  setTimeout(() => { $('cl-plano').value = c.plano || ''; }, 50);
   hide('form-error');
   show('modal-cliente');
 }
@@ -660,7 +677,7 @@ $('cl-plano').addEventListener('change', () => {
 $('form-cliente').addEventListener('submit', async e => {
   e.preventDefault();
   const id = $('cl-id').value;
-  const sid = $('cl-servidor').value;
+  const hasMac = $('cl-has-mac-sim').checked;
   const payload = {
     nome: $('cl-nome').value.trim(),
     whatsapp: $('cl-whatsapp').value.trim(),
@@ -669,24 +686,21 @@ $('form-cliente').addEventListener('submit', async e => {
     vencimento: $('cl-vencimento').value,
     status: $('cl-status').value,
     origem: $('cl-origem').value,
-    servidor_id: sid ? parseInt(sid) : null
+    app_nome: $('cl-app-nome').value.trim(),
+    mac_address: hasMac ? $('cl-mac').value.trim() : null,
+    app_key: hasMac ? $('cl-key').value.trim() : null
   };
   if (!payload.nome || !payload.plano) {
     $('form-error').textContent = 'Preencha os campos obrigatórios.';
-    show('form-error');
-    return;
+    show('form-error'); return;
   }
   let error;
-  if (id) {
-    ({ error } = await db.from('clientes').update(payload).eq('id', id));
-  } else {
-    ({ error } = await db.from('clientes').insert(payload));
-  }
+  if (id) { ({ error } = await db.from('clientes').update(payload).eq('id', id)); }
+  else { ({ error } = await db.from('clientes').insert(payload)); }
   if (error) { $('form-error').textContent = 'Erro: ' + error.message; show('form-error'); return; }
   closeModal();
   toast(id ? 'Cliente atualizado!' : 'Cliente adicionado!', 'success');
-  loadClientes();
-  loadDashboard();
+  loadClientes(); loadDashboard();
 }); 
 
 async function renovar(id) {
@@ -702,45 +716,78 @@ async function renovar(id) {
 }
 
 // === FINANCEIRO ===
+let chartCaptacao = null;
+
 async function loadFinanceiro() {
   const { data } = await db.from('clientes').select('*');
   const clientes = data || [];
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const mes = hoje.getMonth(); const ano = hoje.getFullYear();
+  const periodo = parseInt($('fin-period')?.value || 6);
 
-  const recebido = clientes.filter(c => c.status === 'Ativo' && c.vencimento && (() => {
+  const ativos = clientes.filter(c => c.status === 'Ativo');
+  const vencidos = clientes.filter(c => c.status === 'Vencido' || diasAteVencimento(c.vencimento) < 0);
+  const pendentes = clientes.filter(c => c.status === 'Pendente');
+
+  const receitaMes = ativos.filter(c => {
+    if(!c.vencimento) return false;
     const v = new Date(c.vencimento + 'T00:00:00');
     return v.getMonth() === mes && v.getFullYear() === ano;
-  })()).reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  }).reduce((acc,c) => acc + parseFloat(c.valor||0), 0);
 
-  const aberto = clientes.filter(c => c.status !== 'Ativo').reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  const emAberto = clientes.filter(c => c.status !== 'Ativo').reduce((acc,c) => acc + parseFloat(c.valor||0), 0);
 
-  $('fin-recebido').textContent = fmt(recebido);
-  $('fin-aberto').textContent = fmt(aberto);
+  $('fin-receita-mes').textContent = fmt(receitaMes);
+  $('fin-ativos-count').textContent = ativos.length;
+  $('fin-em-aberto').textContent = fmt(emAberto);
+  $('fin-vencidos-count').textContent = vencidos.length;
 
-  chartFinReceita = renderChartReceita(clientes, 'chart-fin-receita', chartFinReceita);
+  // CHART 1: Line - Receita vs Inadimplência por mês
+  const meses = getUltimos6Meses();
+  const valReceita = meses.map(m => clientes.filter(c => c.status==='Ativo' && c.vencimento && new Date(c.vencimento+'T00:00:00').getMonth()===m.mes && new Date(c.vencimento+'T00:00:00').getFullYear()===m.ano).reduce((a,c)=>a+parseFloat(c.valor||0),0));
+  const valVencidos = meses.map(m => clientes.filter(c => c.status!=='Ativo' && c.vencimento && new Date(c.vencimento+'T00:00:00').getMonth()===m.mes && new Date(c.vencimento+'T00:00:00').getFullYear()===m.ano).reduce((a,c)=>a+parseFloat(c.valor||0),0));
 
-  const lista = clientes.filter(c => {
-    const d = diasAteVencimento(c.vencimento);
-    return d >= 0 && d <= 7;
-  }).sort((a, b) => diasAteVencimento(a.vencimento) - diasAteVencimento(b.vencimento));
+  const ctx1 = $('chart-fin-fluxo').getContext('2d');
+  if(chartFinFluxo) chartFinFluxo.destroy();
+  chartFinFluxo = new Chart(ctx1, { type:'line', data: { labels: meses.map(m=>m.label), datasets: [
+    { label:'Receita', data: valReceita, borderColor:'#10B981', backgroundColor:'rgba(16,185,129,.12)', tension:.4, fill:true, pointBackgroundColor:'#10B981', pointRadius:4 },
+    { label:'Inadimplente', data: valVencidos, borderColor:'#EF4444', backgroundColor:'rgba(239,68,68,.08)', tension:.4, fill:true, pointBackgroundColor:'#EF4444', pointRadius:4 }
+  ]}, options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>fmt(c.parsed.y)}} }, scales:{ x:{grid:{color:'rgba(124,58,237,.08)'},ticks:{color:'#9B93C5'}}, y:{grid:{color:'rgba(124,58,237,.08)'},ticks:{color:'#9B93C5',callback:v=>'R$'+v}} } } });
 
+  // CHART 2: Donut - Situação clientes
+  const ctx2 = $('chart-fin-status').getContext('2d');
+  if(chartFinStatus) chartFinStatus.destroy();
+  chartFinStatus = new Chart(ctx2, { type:'doughnut', data:{ labels:['Ativos','Vencidos','Pendentes'], datasets:[{ data:[ativos.length, vencidos.length, pendentes.length], backgroundColor:['#10B981','#EF4444','#F59E0B'], borderWidth:2, borderColor:'#1E1838', hoverOffset:8 }] }, options:{ responsive:false, plugins:{ legend:{display:false} }, cutout:'68%' } });
+
+  // Legend for donut
+  const total = clientes.length || 1;
+  $('fin-status-legend').innerHTML = [
+    {label:'Ativos', val:ativos.length, color:'#10B981'},
+    {label:'Vencidos', val:vencidos.length, color:'#EF4444'},
+    {label:'Pendentes', val:pendentes.length, color:'#F59E0B'}
+  ].map(i=>`<div class="fin-legend-item"><span class="fin-legend-dot" style="background:${i.color}"></span><span class="fin-legend-label">${i.label}</span><span class="fin-legend-val">${i.val} (${Math.round(i.val/total*100)}%)</span></div>`).join('');
+
+  // CHART 3: Bar - Receita por Plano
+  const porPlano = {};
+  clientes.filter(c=>c.status==='Ativo').forEach(c=>{ const p=c.plano||'Sem Plano'; porPlano[p]=(porPlano[p]||0)+parseFloat(c.valor||0); });
+  const planoLabels = Object.keys(porPlano); const planoVals = Object.values(porPlano);
+  const ctx3 = $('chart-fin-plano').getContext('2d');
+  if(chartFinPlano) chartFinPlano.destroy();
+  chartFinPlano = new Chart(ctx3, { type:'bar', data:{ labels:planoLabels, datasets:[{ label:'Receita', data:planoVals, backgroundColor:'rgba(124,58,237,.55)', borderColor:'#7C3AED', borderWidth:2, borderRadius:8 }] }, options:{ responsive:true, indexAxis:'y', plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>fmt(c.parsed.x)}} }, scales:{ x:{grid:{color:'rgba(124,58,237,.08)'},ticks:{color:'#9B93C5',callback:v=>'R$'+v}}, y:{grid:{display:false},ticks:{color:'#9B93C5'}} } } });
+
+  // Vencimentos da semana
+  const lista7 = clientes.filter(c=>{const d=diasAteVencimento(c.vencimento);return d>=0&&d<=7;}).sort((a,b)=>diasAteVencimento(a.vencimento)-diasAteVencimento(b.vencimento));
   const el = $('fin-vencimentos');
-  if (lista.length === 0) {
-    el.innerHTML = '<div style="color:var(--text-muted);font-size:.88rem;padding:16px 0;text-align:center">Nenhum vencimento na semana.</div>';
-  } else {
-    el.innerHTML = lista.map(c => {
-      const dias = diasAteVencimento(c.vencimento);
-      return `<div class="vencendo-item">
-        <div>
-          <div class="vi-nome">${c.nome}</div>
-          <div class="vi-data">${fmt(c.valor)} — ${new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
-        </div>
-        <span class="vi-dias">${dias === 0 ? 'Hoje' : dias + 'd'}</span>
-      </div>`;
-    }).join('');
-  }
+  el.innerHTML = lista7.length===0 ? '<div style="color:var(--text-muted);font-size:.88rem;padding:16px 0;text-align:center">Nenhum vencimento na semana.</div>' :
+    lista7.map(c=>{const d=diasAteVencimento(c.vencimento);return `<div class="vencendo-item"><div><div class="vi-nome">${c.nome}</div><div class="vi-data">${fmt(c.valor)} — ${new Date(c.vencimento+'T00:00:00').toLocaleDateString('pt-BR')}</div></div><span class="vi-dias">${d===0?'Hoje':d+'d'}</span></div>`;}).join('');
+
+  // Tabela vencidos
+  const tbody = $('tbody-fin-vencidos');
+  if(vencidos.length===0){tbody.innerHTML='';show('fin-vencidos-empty');return;}
+  hide('fin-vencidos-empty');
+  tbody.innerHTML = vencidos.sort((a,b)=>diasAteVencimento(a.vencimento)-diasAteVencimento(b.vencimento)).slice(0,30).map(c=>`<tr><td><strong>${c.nome}</strong></td><td>${c.whatsapp||'—'}</td><td>${c.plano||'—'}</td><td>${fmt(c.valor)}</td><td>${c.vencimento?new Date(c.vencimento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td style="color:#f87171;font-weight:700">${Math.abs(diasAteVencimento(c.vencimento))} dias</td></tr>`).join('');
 }
+$('fin-period')?.addEventListener('change', loadFinanceiro);
 
 // === CAPTAÇÃO ===
 const CAP_CORES = ['#7C3AED','#A78BFA','#10B981','#F59E0B','#EF4444','#60A5FA'];
@@ -802,131 +849,123 @@ async function loadCaptacao() {
   }).join('') || '<div style="color:var(--text-muted);font-size:.88rem;padding:16px 0;text-align:center">Sem dados de captação.</div>';
 }
 
-// === SERVIDORES ===
-async function loadServidores() {
-  const { data } = await db.from('servidores').select('*').order('nome');
-  allServidores = data || [];
-  updateSelectServidores();
+// === PLANOS ===
+async function loadPlanos() {
+  const { data } = await db.from('planos').select('*').order('nome');
+  allPlanos = data || [];
+  updateSelectPlanos();
 }
 
-function updateSelectServidores() {
-  const sel = $('cl-servidor');
+function updateSelectPlanos() {
+  const sel = $('cl-plano');
   if(sel) {
     const val = sel.value;
-    sel.innerHTML = '<option value="">Nenhum servidor</option>' + allServidores.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+    sel.innerHTML = '<option value="">Selecione o plano</option>' + allPlanos.map(p => `<option value="${p.nome}" data-valor="${p.valor}">${p.nome} — ${fmt(p.valor)}</option>`).join('');
     sel.value = val;
   }
 }
 
-async function loadServidoresPage() {
-  await loadServidores();
-  const tbody = $('tbody-servidores');
-  if (allServidores.length === 0) { tbody.innerHTML = ''; show('servidores-empty'); return; }
-  hide('servidores-empty');
-  tbody.innerHTML = allServidores.map(s => {
-    const badgeClass = s.status === 'Ativo' ? 'badge-ativo' : 'badge-vencido';
-    return `<tr>
-      <td><strong>${s.nome}</strong></td>
-      <td>${s.url || '—'}</td>
-      <td>${s.porta || '—'}</td>
-      <td>${s.usuario || '—'}</td>
-      <td>${s.painel ? `<a href="${s.painel}" target="_blank" style="color:var(--purple-light)">Link ↗</a>` : '—'}</td>
-      <td><span class="badge ${badgeClass}">${s.status}</span></td>
-      <td>
-        <div class="table-actions">
-          <button class="action-btn action-edit" onclick="openEditServidor(${s.id})">Editar</button>
-          <button class="action-btn action-delete" onclick="confirmDeleteServidor(${s.id})">Excluir</button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-$('btn-add-servidor').addEventListener('click', () => {
-  $('modal-srv-titulo').textContent = 'Adicionar Servidor';
-  $('form-servidor').reset();
-  $('srv-id').value = '';
-  hide('srv-error');
-  show('modal-servidor');
+// Auto-fill valor when plan selected
+$('cl-plano').addEventListener('change', () => {
+  const sel = $('cl-plano');
+  const opt = sel.options[sel.selectedIndex];
+  if(opt && opt.dataset.valor) $('cl-valor').value = opt.dataset.valor;
 });
 
-$('modal-srv-close').addEventListener('click', () => hide('modal-servidor'));
-$('btn-cancelar-srv').addEventListener('click', () => hide('modal-servidor'));
+async function loadPlanosPage() {
+  await loadPlanos();
+  const tbody = $('tbody-planos');
+  if(!tbody) return;
 
-function openEditServidor(id) {
-  const s = allServidores.find(x => x.id === id);
-  if (!s) return;
-  $('modal-srv-titulo').textContent = 'Editar Servidor';
-  $('srv-id').value = s.id;
-  $('srv-nome').value = s.nome || '';
-  $('srv-url').value = s.url || '';
-  $('srv-porta').value = s.porta || '';
-  $('srv-usuario').value = s.usuario || '';
-  $('srv-senha').value = s.senha || '';
-  $('srv-painel').value = s.painel || '';
-  $('srv-status').value = s.status || 'Ativo';
-  hide('srv-error');
-  show('modal-servidor');
+  // Count clientes per plan
+  const { data: clData } = await db.from('clientes').select('plano, valor, status');
+  const clientes = clData || [];
+
+  if (allPlanos.length === 0) { tbody.innerHTML = ''; show('planos-empty'); }
+  else {
+    hide('planos-empty');
+    tbody.innerHTML = allPlanos.map(p => {
+      const count = clientes.filter(c => c.plano === p.nome).length;
+      const activeCount = clientes.filter(c => c.plano === p.nome && c.status === 'Ativo').length;
+      return `<tr>
+        <td style="color:var(--text-muted);font-size:.8rem">#${p.id}</td>
+        <td><strong>${p.nome}</strong></td>
+        <td style="color:#34d399;font-weight:700">${fmt(p.valor)}</td>
+        <td><span class="badge badge-ativo" style="background:rgba(124,58,237,.15);color:var(--purple-light);border-color:var(--border)">${p.periodicidade||'Mensal'}</span></td>
+        <td>${activeCount} ativos / ${count} total</td>
+        <td><div class="table-actions">
+          <button class="action-btn action-edit" onclick="openEditPlano(${p.id})">Editar</button>
+          <button class="action-btn action-delete" onclick="confirmDeletePlano(${p.id})">Excluir</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Metrics
+  const totalReceita = allPlanos.reduce((a,p) => {
+    const ativos = clientes.filter(c => c.plano===p.nome && c.status==='Ativo').length;
+    return a + (parseFloat(p.valor||0) * ativos);
+  }, 0);
+  const ticket = allPlanos.length ? allPlanos.reduce((a,p)=>a+parseFloat(p.valor||0),0)/allPlanos.length : 0;
+  const comPlano = clientes.filter(c=>c.plano&&c.status==='Ativo').length;
+  $('pl-total').textContent = allPlanos.length;
+  $('pl-ticket').textContent = fmt(ticket);
+  $('pl-clientes').textContent = comPlano;
+  $('pl-receita').textContent = fmt(totalReceita);
 }
 
-$('form-servidor').addEventListener('submit', async e => {
+$('btn-add-plano').addEventListener('click', () => {
+  $('modal-plano-titulo').textContent = 'Novo Plano';
+  $('form-plano').reset();
+  $('pl-id').value = '';
+  hide('plano-error');
+  show('modal-plano');
+});
+
+$('modal-plano-close').addEventListener('click', () => hide('modal-plano'));
+$('btn-cancelar-plano').addEventListener('click', () => hide('modal-plano'));
+
+function openEditPlano(id) {
+  const p = allPlanos.find(x => x.id === id);
+  if(!p) return;
+  $('modal-plano-titulo').textContent = 'Editar Plano';
+  $('pl-id').value = p.id;
+  $('pl-nome').value = p.nome || '';
+  $('pl-valor').value = p.valor || '';
+  $('pl-periodicidade').value = p.periodicidade || 'Mensal';
+  hide('plano-error');
+  show('modal-plano');
+}
+
+$('form-plano').addEventListener('submit', async e => {
   e.preventDefault();
-  const id = $('srv-id').value;
-  const payload = {
-    nome: $('srv-nome').value.trim(),
-    url: $('srv-url').value.trim(),
-    porta: $('srv-porta').value.trim(),
-    usuario: $('srv-usuario').value.trim(),
-    senha: $('srv-senha').value,
-    painel: $('srv-painel').value.trim(),
-    status: $('srv-status').value
-  };
-  if (!payload.nome) { $('srv-error').textContent = 'Nome obrigatório.'; show('srv-error'); return; }
-
+  const id = $('pl-id').value;
+  const payload = { nome: $('pl-nome').value.trim(), valor: parseFloat($('pl-valor').value)||0, periodicidade: $('pl-periodicidade').value };
+  if(!payload.nome) { $('plano-error').textContent='Nome obrigatório.'; show('plano-error'); return; }
   let error;
-  if (id) {
-    ({ error } = await db.from('servidores').update(payload).eq('id', id));
-  } else {
-    ({ error } = await db.from('servidores').insert(payload));
-  }
-  
-  if (error) { $('srv-error').textContent = 'Erro: ' + error.message; show('srv-error'); return; }
-  
-  hide('modal-servidor');
-  toast(id ? 'Servidor atualizado!' : 'Servidor adicionado!', 'success');
-  loadServidoresPage();
+  if(id) { ({error} = await db.from('planos').update(payload).eq('id',id)); }
+  else { ({error} = await db.from('planos').insert(payload)); }
+  if(error) { $('plano-error').textContent='Erro: '+error.message; show('plano-error'); return; }
+  hide('modal-plano');
+  toast(id?'Plano atualizado!':'Plano criado!','success');
+  loadPlanosPage();
 });
 
-// === DELETE GLOBAL ===
-function confirmDeleteCliente(id) {
-  deleteTargetId = id;
-  deleteType = 'cliente';
-  show('modal-confirm');
-}
+function confirmDeleteCliente(id) { deleteTargetId=id; deleteType='cliente'; show('modal-confirm'); }
+function confirmDeletePlano(id) { deleteTargetId=id; deleteType='plano'; show('modal-confirm'); }
 
-function confirmDeleteServidor(id) {
-  deleteTargetId = id;
-  deleteType = 'servidor';
-  show('modal-confirm');
-}
-
-$('confirm-close').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId = null; });
-$('confirm-cancel').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId = null; });
+$('confirm-close').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId=null; });
+$('confirm-cancel').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId=null; });
 $('confirm-delete').addEventListener('click', async () => {
-  if (!deleteTargetId || !deleteType) return;
-  const tabela = deleteType === 'cliente' ? 'clientes' : 'servidores';
-  const { error } = await db.from(tabela).delete().eq('id', deleteTargetId);
+  if(!deleteTargetId||!deleteType) return;
+  const tabela = deleteType==='cliente'?'clientes':'planos';
+  const {error} = await db.from(tabela).delete().eq('id', deleteTargetId);
   hide('modal-confirm');
-  
-  if (error) { toast('Erro ao excluir.', 'error'); return; }
-  toast(deleteType === 'cliente' ? 'Cliente excluído.' : 'Servidor excluído.', 'success');
-  
-  if(deleteType === 'cliente') {
-    loadClientes(); loadDashboard();
-  } else {
-    loadServidoresPage();
-  }
-  deleteTargetId = null; deleteType = null;
+  if(error){toast('Erro ao excluir.','error');return;}
+  toast(deleteType==='cliente'?'Cliente excluído.':'Plano excluído.','success');
+  if(deleteType==='cliente'){loadClientes();loadDashboard();}
+  else{loadPlanosPage();}
+  deleteTargetId=null; deleteType=null;
 });
 
 // === CONFIGURAÇÕES & 2FA ===
@@ -1084,7 +1123,11 @@ window.addEventListener('load', () => {
   }
 });
 
-window.openEditServidor = openEditServidor;
+window.openEdit = openEdit;
+window.renovar = renovar;
+window.confirmDeleteCliente = confirmDeleteCliente;
+window.confirmDeletePlano = confirmDeletePlano;
+window.openEditPlano = openEditPlano;
 
 // === WHATSAPP MODULE ===
 const EVO_URL = 'https://evolution-api-production-651d.up.railway.app';
