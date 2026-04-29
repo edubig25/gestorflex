@@ -21,15 +21,18 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<script>
+  // Mata qualquer Service Worker antigo que esteja travando o cache
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      for(let registration of registrations) {
+        registration.unregister();
+        console.log('SW Unregistered');
+      }
+    });
+  }
+</script>
 
-<!-- SPLASH -->
-<div id="splash" class="splash">
-  <div class="splash-logo">
-    <div class="logo-icon">⚡</div>
-    <span class="logo-text">Gestor <span class="logo-accent">Flex</span></span>
-  </div>
-  <div class="splash-spinner"></div>
-</div>
 
 
 <!-- SETUP -->
@@ -51,7 +54,7 @@
 </div>
 
 <!-- LOGIN -->
-<div id="login-screen" class="auth-screen hidden">
+<div id="login-screen" class="auth-screen">
   <div class="auth-card">
     <div class="auth-logo"><div class="logo-icon">⚡</div><span class="logo-text">Gestor <span class="logo-accent">Flex</span></span></div>
     <h2 class="auth-title">Entrar na plataforma</h2>

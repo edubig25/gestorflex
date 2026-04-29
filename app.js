@@ -13,17 +13,18 @@ setTimeout(() => {
 // === SUPABASE SETUP ===
 let db;
 try {
+  console.log('Starting Supabase init...');
   const SUPA_URL = 'https://onnqatmndtjafyhtjsjb.supabase.co';
   const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubnFhdG1uZHRqYWZ5aHRqc2piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTcwNjYsImV4cCI6MjA5Mjg5MzA2Nn0.1TBz5189kyWwQLh0FnBtMwZu_hWmsQ5OPwWMVUlNzHo';
   
-  if (typeof window.supabase !== 'undefined') {
-    db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-    console.log('Supabase initialized successfully');
+  if (typeof supabase !== 'undefined') {
+    db = supabase.createClient(SUPA_URL, SUPA_KEY);
+    console.log('Supabase initialized');
   } else {
-    console.error('ERRO: Biblioteca Supabase não encontrada no carregamento.');
+    alert('ERRO: A biblioteca do banco de dados (Supabase) não carregou. Verifique sua internet ou se há bloqueadores de anúncios.');
   }
 } catch (e) {
-  console.error('Supabase init error:', e);
+  alert('Erro ao iniciar banco: ' + e.message);
 }
 
 // === STATE ===
@@ -260,6 +261,7 @@ $('setup-form').addEventListener('submit', async e => {
 // === LOGIN ===
 $('login-form').addEventListener('submit', async e => {
   e.preventDefault();
+  alert('Botão Entrar clicado! Tentando conexão...');
   try {
     const email = $('login-email').value.trim();
     const senha = $('login-senha').value;
@@ -267,34 +269,43 @@ $('login-form').addEventListener('submit', async e => {
     hide('login-error');
 
     if (!db) {
-      toast('Sistema de banco de dados não carregou. Recarregue a página.', 'error');
+      alert('Banco de dados não disponível. Recarregue a página.');
       return;
     }
 
     const btn = e.submitter || $('login-form').querySelector('button[type="submit"]');
     const originalText = btn.textContent;
-    btn.textContent = 'Entrando...';
+    btn.textContent = 'Verificando...';
     btn.disabled = true;
 
-    // Supabase Auth nativo para login
+    console.log('Calling signInWithPassword...');
     const { data: authData, error: authErr } = await db.auth.signInWithPassword({
       email: email,
       password: senha
     });
 
-    if (authErr || !authData.user) {
+    if (authErr) {
+      alert('Erro de Autenticação: ' + authErr.message);
       btn.textContent = originalText;
       btn.disabled = false;
       err.textContent = 'E-mail ou senha incorretos.';
       show('login-error');
       return;
     }
-
-    console.log('Auth success, fetching user data...');
-    // Busca dados adicionais do usuário
-    const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', authData.user.id).single();
     
-    if (!customUser) {
+    if (!authData.user) {
+      alert('Erro: Login bem sucedido mas usuário não retornado.');
+      btn.textContent = originalText;
+      btn.disabled = false;
+      return;
+    }
+
+    alert('Sucesso no Auth! Buscando seus dados...');
+    // Busca dados adicionais do usuário
+    const { data: customUser, error: dbErr } = await db.from('usuarios').select('*').eq('auth_id', authData.user.id).single();
+    
+    if (dbErr || !customUser) {
+      alert('Usuário não encontrado na tabela "usuarios".');
       btn.textContent = originalText;
       btn.disabled = false;
       err.textContent = 'Usuário não encontrado na base de dados.';
@@ -303,6 +314,7 @@ $('login-form').addEventListener('submit', async e => {
     }
 
     const user = { ...authData.user, ...customUser };
+    alert('Tudo pronto! Entrando no sistema...');
 
     if (user.two_factor_enabled) {
       tempLoginUser = user;
@@ -314,8 +326,8 @@ $('login-form').addEventListener('submit', async e => {
       finishLogin(user);
     }
   } catch (error) {
+    alert('Erro fatal no login: ' + error.message);
     console.error('Login error:', error);
-    toast('Erro inesperado ao logar. Tente novamente.', 'error');
   }
 });
 
