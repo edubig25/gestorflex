@@ -1,8 +1,24 @@
+console.log('App JS Loading...');
+// === UTILS ===
+const $ = id => document.getElementById(id);
+const show = id => $(id) && $(id).classList.remove('hidden');
+const hide = id => $(id) && $(id).classList.add('hidden');
+
+// Emergência: esconde o splash se o JS demorar muito (garantia extra)
+setTimeout(() => {
+  console.log('Emergency splash hide triggered');
+  hide('splash');
+}, 1500);
+
 // === SUPABASE SETUP ===
-const SUPA_URL = 'https://onnqatmndtjafyhtjsjb.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubnFhdG1uZHRqYWZ5aHRqc2piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTcwNjYsImV4cCI6MjA5Mjg5MzA2Nn0.1TBz5189kyWwQLh0FnBtMwZu_hWmsQ5OPwWMVUlNzHo';
-const { createClient } = supabase;
-const db = createClient(SUPA_URL, SUPA_KEY);
+let db;
+try {
+  const SUPA_URL = 'https://onnqatmndtjafyhtjsjb.supabase.co';
+  const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubnFhdG1uZHRqYWZ5aHRqc2piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTcwNjYsImV4cCI6MjA5Mjg5MzA2Nn0.1TBz5189kyWwQLh0FnBtMwZu_hWmsQ5OPwWMVUlNzHo';
+  db = supabase.createClient(SUPA_URL, SUPA_KEY);
+} catch (e) {
+  console.error('Supabase init error:', e);
+}
 
 // === STATE ===
 let currentUser = null;
@@ -18,10 +34,6 @@ let tempLoginUser = null;
 let forgotEmailTarget = null;
 let tempSecret2FA = null;
 
-// === UTILS ===
-const $ = id => document.getElementById(id);
-const show = id => $(id) && $(id).classList.remove('hidden');
-const hide = id => $(id) && $(id).classList.add('hidden');
 
 function toast(msg, type = 'info') {
   const t = $('toast');
@@ -58,8 +70,12 @@ function planoMeses(plano) {
 // === BOOT ===
 async function boot() {
   try {
-    // Esconde o splash após um pequeno delay para garantir que o CSS carregou
-    setTimeout(() => hide('splash'), 500);
+    // Esconde o splash imediatamente ao iniciar o boot
+    hide('splash');
+
+    if (!db) {
+      throw new Error('Banco de dados não inicializado');
+    }
 
     const { data: { session }, error: sessionErr } = await db.auth.getSession();
     
@@ -1534,6 +1550,9 @@ function filterWaHistoryTable() {
 }
 
 // Inicia o app ao final de todos os scripts
-window.onload = () => {
+// Inicia o app assim que o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  // Garantia extra: esconde o splash se algo der muito errado após 3 segundos
+  setTimeout(() => hide('splash'), 3000);
   boot();
-};
+});
