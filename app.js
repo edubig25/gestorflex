@@ -16,7 +16,7 @@ try {
   console.log('Starting Supabase init...');
   const SUPA_URL = 'https://onnqatmndtjafyhtjsjb.supabase.co';
   const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubnFhdG1uZHRqYWZ5aHRqc2piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTcwNjYsImV4cCI6MjA5Mjg5MzA2Nn0.1TBz5189kyWwQLh0FnBtMwZu_hWmsQ5OPwWMVUlNzHo';
-  
+
   if (typeof supabase !== 'undefined') {
     db = supabase.createClient(SUPA_URL, SUPA_KEY);
     console.log('Supabase initialized');
@@ -31,20 +31,22 @@ try {
 let currentUser = null;
 let allClientes = [];
 let allPlanos = [];
+let allServidores = [];
 let chartReceita = null;
 let chartFinFluxo = null;
 let chartFinStatus = null;
 let chartFinPlano = null;
+let chartCaptacao = null;
 let deleteTargetId = null;
 let deleteType = null;
-let tempLoginUser = null; 
+let tempLoginUser = null;
 let forgotEmailTarget = null;
 let tempSecret2FA = null;
 
 
 function toast(msg, type = 'info') {
   const t = $('toast');
-  if(!t) return;
+  if (!t) return;
   t.textContent = msg;
   t.style.borderColor = type === 'error' ? 'rgba(239,68,68,.5)' : type === 'success' ? 'rgba(16,185,129,.5)' : 'var(--border)';
   t.classList.remove('hidden');
@@ -57,14 +59,14 @@ function fmt(val) {
 }
 
 function diasAteVencimento(dateStr) {
-  if(!dateStr) return -1;
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if (!dateStr) return -1;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const venc = new Date(dateStr + 'T00:00:00');
   return Math.round((venc - hoje) / 86400000);
 }
 
 function addMeses(date, meses) {
-  if(!date) return '';
+  if (!date) return '';
   const d = new Date(date);
   d.setMonth(d.getMonth() + meses);
   return d.toISOString().split('T')[0];
@@ -85,39 +87,39 @@ async function boot() {
     }
 
     const { data: { session }, error: sessionErr } = await db.auth.getSession();
-    
+
     // Verifica se o banco já foi configurado checando a tabela "usuarios"
     const { data: usersData, error: usersErr } = await db.from('usuarios').select('id, auth_id').limit(1);
 
-  if (usersErr && (usersErr.code === '42P01' || usersErr.message?.includes('does not exist') || usersErr.message?.includes('auth_id'))) {
-    showDbSetup();
-    return;
-  }
-
-  // Se não houver nenhum usuário criado
-  if (!usersErr && (!usersData || usersData.length === 0)) {
-    show('setup-screen');
-    return;
-  }
-
-  // Se existe sessão no Supabase Auth
-  if (session && session.user) {
-    const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', session.user.id).single();
-    if (customUser) {
-      currentUser = { ...session.user, ...customUser };
-      
-      if (currentUser.two_factor_enabled) {
-        tempLoginUser = currentUser;
-        show('twofa-screen');
-        $('twofa-code').focus();
-      } else {
-        enterApp();
-      }
+    if (usersErr && (usersErr.code === '42P01' || usersErr.message?.includes('does not exist') || usersErr.message?.includes('auth_id'))) {
+      showDbSetup();
       return;
     }
-  }
 
-  show('login-screen');
+    // Se não houver nenhum usuário criado
+    if (!usersErr && (!usersData || usersData.length === 0)) {
+      show('setup-screen');
+      return;
+    }
+
+    // Se existe sessão no Supabase Auth
+    if (session && session.user) {
+      const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', session.user.id).single();
+      if (customUser) {
+        currentUser = { ...session.user, ...customUser };
+
+        if (currentUser.two_factor_enabled) {
+          tempLoginUser = currentUser;
+          show('twofa-screen');
+          $('twofa-code').focus();
+        } else {
+          enterApp();
+        }
+        return;
+      }
+    }
+
+    show('login-screen');
   } catch (err) {
     console.error('Boot error:', err);
     hide('splash');
@@ -226,10 +228,10 @@ $('setup-form').addEventListener('submit', async e => {
     password: senha
   });
 
-  if (authErr) { 
-    err.textContent = 'Erro ao criar conta no Auth: ' + authErr.message; 
-    show('setup-error'); 
-    return; 
+  if (authErr) {
+    err.textContent = 'Erro ao criar conta no Auth: ' + authErr.message;
+    show('setup-error');
+    return;
   }
 
   // Se 'user' não existir, significa que precisa confirmar e-mail
@@ -240,17 +242,17 @@ $('setup-form').addEventListener('submit', async e => {
   }
 
   // 2. Salva o resto na tabela usuarios
-  const { error: dbErr } = await db.from('usuarios').insert({ 
+  const { error: dbErr } = await db.from('usuarios').insert({
     auth_id: authData.user.id,
-    nome: nome, 
-    usuario: usuario, 
-    email: email 
+    nome: nome,
+    usuario: usuario,
+    email: email
   });
 
-  if (dbErr) { 
-    err.textContent = 'Erro ao vincular usuário no banco: ' + dbErr.message; 
-    show('setup-error'); 
-    return; 
+  if (dbErr) {
+    err.textContent = 'Erro ao vincular usuário no banco: ' + dbErr.message;
+    show('setup-error');
+    return;
   }
 
   hide('setup-screen');
@@ -292,7 +294,7 @@ $('login-form').addEventListener('submit', async e => {
       show('login-error');
       return;
     }
-    
+
     if (!authData.user) {
       alert('Erro: Login bem sucedido mas usuário não retornado.');
       btn.textContent = originalText;
@@ -303,7 +305,7 @@ $('login-form').addEventListener('submit', async e => {
     alert('Sucesso no Auth! Buscando seus dados...');
     // Busca dados adicionais do usuário
     const { data: customUser, error: dbErr } = await db.from('usuarios').select('*').eq('auth_id', authData.user.id).single();
-    
+
     if (dbErr || !customUser) {
       alert('Usuário não encontrado na tabela "usuarios".');
       btn.textContent = originalText;
@@ -393,7 +395,7 @@ $('forgot-cancel').addEventListener('click', () => hide('modal-forgot'));
 
 $('form-forgot').addEventListener('submit', async e => {
   e.preventDefault();
-  
+
   // Se o botão for "Continuar para Redefinir"
   if ($('forgot-code-box').classList.contains('hidden') === false) {
     hide('modal-forgot');
@@ -418,12 +420,12 @@ $('form-forgot').addEventListener('submit', async e => {
 
   forgotEmailTarget = email;
   toast('E-mail enviado! Verifique sua caixa de entrada.', 'success');
-  
+
   // Como estamos num arquivo local, o link do email não funcionará. 
   // O usuário deve digitar o código (OTP)
   $('forgot-code-value').innerHTML = '<span style="font-size:1.1rem;color:var(--text)">Acesse seu e-mail e copie o código recebido.</span>';
   $('forgot-code-box').classList.remove('hidden');
-  
+
   $('forgot-submit').textContent = 'Já copiei o código, Continuar';
 });
 
@@ -439,7 +441,7 @@ $('form-reset').addEventListener('submit', async e => {
   hide('reset-error');
 
   if (senha !== confirmar) { err.textContent = 'Senhas não coincidem.'; show('reset-error'); return; }
-  
+
   // 1. Verifica o código (OTP) no Supabase nativo
   const { data: verifyData, error: verifyErr } = await db.auth.verifyOtp({
     email: forgotEmailTarget,
@@ -455,7 +457,7 @@ $('form-reset').addEventListener('submit', async e => {
 
   // 2. Com a sessão recuperada pelo OTP, altera a senha
   const { error: updateErr } = await db.auth.updateUser({ password: senha });
-  
+
   if (updateErr) {
     err.textContent = 'Erro ao definir a nova senha: ' + updateErr.message;
     show('reset-error');
@@ -479,8 +481,8 @@ function enterApp() {
     // MAC/KEY toggle
     document.querySelectorAll('input[name="cl-has-mac"]').forEach(r => {
       r.addEventListener('change', () => {
-        if($('cl-has-mac-sim').checked) show('mac-key-fields');
-        else { hide('mac-key-fields'); $('cl-mac').value=''; $('cl-key').value=''; }
+        if ($('cl-has-mac-sim').checked) show('mac-key-fields');
+        else { hide('mac-key-fields'); $('cl-mac').value = ''; $('cl-key').value = ''; }
       });
     });
   } catch (err) {
@@ -514,7 +516,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
 function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
-  const titles = { dashboard:'Dashboard', clientes:'Clientes', financeiro:'Financeiro', captacao:'Captação', planos:'Planos', whatsapp:'WhatsApp', configuracoes:'Configurações' };
+  const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', whatsapp: 'WhatsApp', configuracoes: 'Configurações' };
   $('topbar-title').textContent = titles[page] || '';
   if (page === 'clientes') loadClientes();
   if (page === 'financeiro') loadFinanceiro();
@@ -537,7 +539,7 @@ async function loadDashboard() {
 }
 
 function renderDashMetrics(clientes) {
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const total = clientes.length;
   const ativos = clientes.filter(c => c.status === 'Ativo').length;
   const vencendo7 = clientes.filter(c => {
@@ -548,7 +550,7 @@ function renderDashMetrics(clientes) {
   const mes = hoje.getMonth();
   const ano = hoje.getFullYear();
   const receita = clientes
-    .filter(c => c.status === 'Ativo' && c.vencimento) 
+    .filter(c => c.status === 'Ativo' && c.vencimento)
     .reduce((acc, c) => {
       const v = new Date(c.vencimento + 'T00:00:00');
       if (v.getMonth() === mes && v.getFullYear() === ano) return acc + parseFloat(c.valor || 0);
@@ -772,7 +774,7 @@ $('form-cliente').addEventListener('submit', async e => {
   closeModal();
   toast(id ? 'Cliente atualizado!' : 'Cliente adicionado!', 'success');
   loadClientes(); loadDashboard();
-}); 
+});
 
 async function renovar(id) {
   const c = allClientes.find(x => x.id === id);
@@ -787,15 +789,11 @@ async function renovar(id) {
 }
 
 // === FINANCEIRO ===
-let chartFinFluxo = null;
-let chartFinStatus = null;
-let chartFinPlano = null;
-let chartCaptacao = null;
 
 async function loadFinanceiro() {
   const { data } = await db.from('clientes').select('*');
   const clientes = data || [];
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const mes = hoje.getMonth(); const ano = hoje.getFullYear();
   const periodo = parseInt($('fin-period')?.value || 6);
 
@@ -804,12 +802,12 @@ async function loadFinanceiro() {
   const pendentes = clientes.filter(c => c.status === 'Pendente');
 
   const receitaMes = ativos.filter(c => {
-    if(!c.vencimento) return false;
+    if (!c.vencimento) return false;
     const v = new Date(c.vencimento + 'T00:00:00');
     return v.getMonth() === mes && v.getFullYear() === ano;
-  }).reduce((acc,c) => acc + parseFloat(c.valor||0), 0);
+  }).reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
 
-  const emAberto = clientes.filter(c => c.status !== 'Ativo').reduce((acc,c) => acc + parseFloat(c.valor||0), 0);
+  const emAberto = clientes.filter(c => c.status !== 'Ativo').reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
 
   $('fin-receita-mes').textContent = fmt(receitaMes);
   $('fin-ativos-count').textContent = ativos.length;
@@ -818,53 +816,57 @@ async function loadFinanceiro() {
 
   // CHART 1: Line - Receita vs Inadimplência por mês
   const meses = getUltimos6Meses();
-  const valReceita = meses.map(m => clientes.filter(c => c.status==='Ativo' && c.vencimento && new Date(c.vencimento+'T00:00:00').getMonth()===m.mes && new Date(c.vencimento+'T00:00:00').getFullYear()===m.ano).reduce((a,c)=>a+parseFloat(c.valor||0),0));
-  const valVencidos = meses.map(m => clientes.filter(c => c.status!=='Ativo' && c.vencimento && new Date(c.vencimento+'T00:00:00').getMonth()===m.mes && new Date(c.vencimento+'T00:00:00').getFullYear()===m.ano).reduce((a,c)=>a+parseFloat(c.valor||0),0));
+  const valReceita = meses.map(m => clientes.filter(c => c.status === 'Ativo' && c.vencimento && new Date(c.vencimento + 'T00:00:00').getMonth() === m.mes && new Date(c.vencimento + 'T00:00:00').getFullYear() === m.ano).reduce((a, c) => a + parseFloat(c.valor || 0), 0));
+  const valVencidos = meses.map(m => clientes.filter(c => c.status !== 'Ativo' && c.vencimento && new Date(c.vencimento + 'T00:00:00').getMonth() === m.mes && new Date(c.vencimento + 'T00:00:00').getFullYear() === m.ano).reduce((a, c) => a + parseFloat(c.valor || 0), 0));
 
   const ctx1 = $('chart-fin-fluxo').getContext('2d');
-  if(chartFinFluxo) chartFinFluxo.destroy();
-  chartFinFluxo = new Chart(ctx1, { type:'line', data: { labels: meses.map(m=>m.label), datasets: [
-    { label:'Receita', data: valReceita, borderColor:'#10B981', backgroundColor:'rgba(16,185,129,.12)', tension:.4, fill:true, pointBackgroundColor:'#10B981', pointRadius:4 },
-    { label:'Inadimplente', data: valVencidos, borderColor:'#EF4444', backgroundColor:'rgba(239,68,68,.08)', tension:.4, fill:true, pointBackgroundColor:'#EF4444', pointRadius:4 }
-  ]}, options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>fmt(c.parsed.y)}} }, scales:{ x:{grid:{color:'rgba(124,58,237,.08)'},ticks:{color:'#9B93C5'}}, y:{grid:{color:'rgba(124,58,237,.08)'},ticks:{color:'#9B93C5',callback:v=>'R$'+v}} } } });
+  if (chartFinFluxo) chartFinFluxo.destroy();
+  chartFinFluxo = new Chart(ctx1, {
+    type: 'line', data: {
+      labels: meses.map(m => m.label), datasets: [
+        { label: 'Receita', data: valReceita, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,.12)', tension: .4, fill: true, pointBackgroundColor: '#10B981', pointRadius: 4 },
+        { label: 'Inadimplente', data: valVencidos, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,.08)', tension: .4, fill: true, pointBackgroundColor: '#EF4444', pointRadius: 4 }
+      ]
+    }, options: { responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.y) } } }, scales: { x: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5' } }, y: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5', callback: v => 'R$' + v } } } }
+  });
 
   // CHART 2: Donut - Situação clientes
   const ctx2 = $('chart-fin-status').getContext('2d');
-  if(chartFinStatus) chartFinStatus.destroy();
-  chartFinStatus = new Chart(ctx2, { type:'doughnut', data:{ labels:['Ativos','Vencidos','Pendentes'], datasets:[{ data:[ativos.length, vencidos.length, pendentes.length], backgroundColor:['#10B981','#EF4444','#F59E0B'], borderWidth:2, borderColor:'#1E1838', hoverOffset:8 }] }, options:{ responsive:false, plugins:{ legend:{display:false} }, cutout:'68%' } });
+  if (chartFinStatus) chartFinStatus.destroy();
+  chartFinStatus = new Chart(ctx2, { type: 'doughnut', data: { labels: ['Ativos', 'Vencidos', 'Pendentes'], datasets: [{ data: [ativos.length, vencidos.length, pendentes.length], backgroundColor: ['#10B981', '#EF4444', '#F59E0B'], borderWidth: 2, borderColor: '#1E1838', hoverOffset: 8 }] }, options: { responsive: false, plugins: { legend: { display: false } }, cutout: '68%' } });
 
   // Legend for donut
   const total = clientes.length || 1;
   $('fin-status-legend').innerHTML = [
-    {label:'Ativos', val:ativos.length, color:'#10B981'},
-    {label:'Vencidos', val:vencidos.length, color:'#EF4444'},
-    {label:'Pendentes', val:pendentes.length, color:'#F59E0B'}
-  ].map(i=>`<div class="fin-legend-item"><span class="fin-legend-dot" style="background:${i.color}"></span><span class="fin-legend-label">${i.label}</span><span class="fin-legend-val">${i.val} (${Math.round(i.val/total*100)}%)</span></div>`).join('');
+    { label: 'Ativos', val: ativos.length, color: '#10B981' },
+    { label: 'Vencidos', val: vencidos.length, color: '#EF4444' },
+    { label: 'Pendentes', val: pendentes.length, color: '#F59E0B' }
+  ].map(i => `<div class="fin-legend-item"><span class="fin-legend-dot" style="background:${i.color}"></span><span class="fin-legend-label">${i.label}</span><span class="fin-legend-val">${i.val} (${Math.round(i.val / total * 100)}%)</span></div>`).join('');
 
   // CHART 3: Bar - Receita por Plano
   const porPlano = {};
-  clientes.filter(c=>c.status==='Ativo').forEach(c=>{ const p=c.plano||'Sem Plano'; porPlano[p]=(porPlano[p]||0)+parseFloat(c.valor||0); });
+  clientes.filter(c => c.status === 'Ativo').forEach(c => { const p = c.plano || 'Sem Plano'; porPlano[p] = (porPlano[p] || 0) + parseFloat(c.valor || 0); });
   const planoLabels = Object.keys(porPlano); const planoVals = Object.values(porPlano);
   const ctx3 = $('chart-fin-plano').getContext('2d');
-  if(chartFinPlano) chartFinPlano.destroy();
-  chartFinPlano = new Chart(ctx3, { type:'bar', data:{ labels:planoLabels, datasets:[{ label:'Receita', data:planoVals, backgroundColor:'rgba(124,58,237,.55)', borderColor:'#7C3AED', borderWidth:2, borderRadius:8 }] }, options:{ responsive:true, indexAxis:'y', plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>fmt(c.parsed.x)}} }, scales:{ x:{grid:{color:'rgba(124,58,237,.08)'},ticks:{color:'#9B93C5',callback:v=>'R$'+v}}, y:{grid:{display:false},ticks:{color:'#9B93C5'}} } } });
+  if (chartFinPlano) chartFinPlano.destroy();
+  chartFinPlano = new Chart(ctx3, { type: 'bar', data: { labels: planoLabels, datasets: [{ label: 'Receita', data: planoVals, backgroundColor: 'rgba(124,58,237,.55)', borderColor: '#7C3AED', borderWidth: 2, borderRadius: 8 }] }, options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.x) } } }, scales: { x: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5', callback: v => 'R$' + v } }, y: { grid: { display: false }, ticks: { color: '#9B93C5' } } } } });
 
   // Vencimentos da semana
-  const lista7 = clientes.filter(c=>{const d=diasAteVencimento(c.vencimento);return d>=0&&d<=7;}).sort((a,b)=>diasAteVencimento(a.vencimento)-diasAteVencimento(b.vencimento));
+  const lista7 = clientes.filter(c => { const d = diasAteVencimento(c.vencimento); return d >= 0 && d <= 7; }).sort((a, b) => diasAteVencimento(a.vencimento) - diasAteVencimento(b.vencimento));
   const el = $('fin-vencimentos');
-  el.innerHTML = lista7.length===0 ? '<div style="color:var(--text-muted);font-size:.88rem;padding:16px 0;text-align:center">Nenhum vencimento na semana.</div>' :
-    lista7.map(c=>{const d=diasAteVencimento(c.vencimento);return `<div class="vencendo-item"><div><div class="vi-nome">${c.nome}</div><div class="vi-data">${fmt(c.valor)} — ${new Date(c.vencimento+'T00:00:00').toLocaleDateString('pt-BR')}</div></div><span class="vi-dias">${d===0?'Hoje':d+'d'}</span></div>`;}).join('');
+  el.innerHTML = lista7.length === 0 ? '<div style="color:var(--text-muted);font-size:.88rem;padding:16px 0;text-align:center">Nenhum vencimento na semana.</div>' :
+    lista7.map(c => { const d = diasAteVencimento(c.vencimento); return `<div class="vencendo-item"><div><div class="vi-nome">${c.nome}</div><div class="vi-data">${fmt(c.valor)} — ${new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}</div></div><span class="vi-dias">${d === 0 ? 'Hoje' : d + 'd'}</span></div>`; }).join('');
 
   // Tabela vencidos
   const tbody = $('tbody-fin-vencidos');
-  if(vencidos.length===0){tbody.innerHTML='';show('fin-vencidos-empty');return;}
+  if (vencidos.length === 0) { tbody.innerHTML = ''; show('fin-vencidos-empty'); return; }
   hide('fin-vencidos-empty');
-  tbody.innerHTML = vencidos.sort((a,b)=>diasAteVencimento(a.vencimento)-diasAteVencimento(b.vencimento)).slice(0,30).map(c=>`<tr><td><strong>${c.nome}</strong></td><td>${c.whatsapp||'—'}</td><td>${c.plano||'—'}</td><td>${fmt(c.valor)}</td><td>${c.vencimento?new Date(c.vencimento+'T00:00:00').toLocaleDateString('pt-BR'):'—'}</td><td style="color:#f87171;font-weight:700">${Math.abs(diasAteVencimento(c.vencimento))} dias</td></tr>`).join('');
+  tbody.innerHTML = vencidos.sort((a, b) => diasAteVencimento(a.vencimento) - diasAteVencimento(b.vencimento)).slice(0, 30).map(c => `<tr><td><strong>${c.nome}</strong></td><td>${c.whatsapp || '—'}</td><td>${c.plano || '—'}</td><td>${fmt(c.valor)}</td><td>${c.vencimento ? new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td><td style="color:#f87171;font-weight:700">${Math.abs(diasAteVencimento(c.vencimento))} dias</td></tr>`).join('');
 }
 $('fin-period')?.addEventListener('change', loadFinanceiro);
 
 // === CAPTAÇÃO ===
-const CAP_CORES = ['#7C3AED','#A78BFA','#10B981','#F59E0B','#EF4444','#60A5FA'];
+const CAP_CORES = ['#7C3AED', '#A78BFA', '#10B981', '#F59E0B', '#EF4444', '#60A5FA'];
 
 async function loadCaptacao() {
   const { data } = await db.from('clientes').select('origem, status');
@@ -932,7 +934,7 @@ async function loadPlanos() {
 
 function updateSelectPlanos() {
   const sel = $('cl-plano');
-  if(sel) {
+  if (sel) {
     const val = sel.value;
     sel.innerHTML = '<option value="">Selecione o plano</option>' + allPlanos.map(p => `<option value="${p.nome}" data-valor="${p.valor}">${p.nome} — ${fmt(p.valor)}</option>`).join('');
     sel.value = val;
@@ -943,13 +945,13 @@ function updateSelectPlanos() {
 $('cl-plano').addEventListener('change', () => {
   const sel = $('cl-plano');
   const opt = sel.options[sel.selectedIndex];
-  if(opt && opt.dataset.valor) $('cl-valor').value = opt.dataset.valor;
+  if (opt && opt.dataset.valor) $('cl-valor').value = opt.dataset.valor;
 });
 
 async function loadPlanosPage() {
   await loadPlanos();
   const tbody = $('tbody-planos');
-  if(!tbody) return;
+  if (!tbody) return;
 
   // Count clientes per plan
   const { data: clData } = await db.from('clientes').select('plano, valor, status');
@@ -965,7 +967,7 @@ async function loadPlanosPage() {
         <td style="color:var(--text-muted);font-size:.8rem">#${p.id}</td>
         <td><strong>${p.nome}</strong></td>
         <td style="color:#34d399;font-weight:700">${fmt(p.valor)}</td>
-        <td><span class="badge badge-ativo" style="background:rgba(124,58,237,.15);color:var(--purple-light);border-color:var(--border)">${p.periodicidade||'Mensal'}</span></td>
+        <td><span class="badge badge-ativo" style="background:rgba(124,58,237,.15);color:var(--purple-light);border-color:var(--border)">${p.periodicidade || 'Mensal'}</span></td>
         <td>${activeCount} ativos / ${count} total</td>
         <td><div class="table-actions">
           <button class="action-btn action-edit" onclick="openEditPlano(${p.id})">Editar</button>
@@ -976,12 +978,12 @@ async function loadPlanosPage() {
   }
 
   // Metrics
-  const totalReceita = allPlanos.reduce((a,p) => {
-    const ativos = clientes.filter(c => c.plano===p.nome && c.status==='Ativo').length;
-    return a + (parseFloat(p.valor||0) * ativos);
+  const totalReceita = allPlanos.reduce((a, p) => {
+    const ativos = clientes.filter(c => c.plano === p.nome && c.status === 'Ativo').length;
+    return a + (parseFloat(p.valor || 0) * ativos);
   }, 0);
-  const ticket = allPlanos.length ? allPlanos.reduce((a,p)=>a+parseFloat(p.valor||0),0)/allPlanos.length : 0;
-  const comPlano = clientes.filter(c=>c.plano&&c.status==='Ativo').length;
+  const ticket = allPlanos.length ? allPlanos.reduce((a, p) => a + parseFloat(p.valor || 0), 0) / allPlanos.length : 0;
+  const comPlano = clientes.filter(c => c.plano && c.status === 'Ativo').length;
   $('pl-total').textContent = allPlanos.length;
   $('pl-ticket').textContent = fmt(ticket);
   $('pl-clientes').textContent = comPlano;
@@ -1001,7 +1003,7 @@ $('btn-cancelar-plano').addEventListener('click', () => hide('modal-plano'));
 
 function openEditPlano(id) {
   const p = allPlanos.find(x => x.id === id);
-  if(!p) return;
+  if (!p) return;
   $('modal-plano-titulo').textContent = 'Editar Plano';
   $('pl-id').value = p.id;
   $('pl-nome').value = p.nome || '';
@@ -1015,37 +1017,37 @@ function openEditPlano(id) {
 $('form-plano').addEventListener('submit', async e => {
   e.preventDefault();
   const id = $('pl-id').value;
-  const payload = { 
-    nome: $('pl-nome').value.trim(), 
-    valor: parseFloat($('pl-valor').value)||0, 
-    custo: parseFloat($('pl-custo').value)||0,
-    periodicidade: $('pl-periodicidade').value 
+  const payload = {
+    nome: $('pl-nome').value.trim(),
+    valor: parseFloat($('pl-valor').value) || 0,
+    custo: parseFloat($('pl-custo').value) || 0,
+    periodicidade: $('pl-periodicidade').value
   };
-  if(!payload.nome) { $('plano-error').textContent='Nome obrigatório.'; show('plano-error'); return; }
+  if (!payload.nome) { $('plano-error').textContent = 'Nome obrigatório.'; show('plano-error'); return; }
   let error;
-  if(id) { ({error} = await db.from('planos').update(payload).eq('id',id)); }
-  else { ({error} = await db.from('planos').insert(payload)); }
-  if(error) { $('plano-error').textContent='Erro: '+error.message; show('plano-error'); return; }
+  if (id) { ({ error } = await db.from('planos').update(payload).eq('id', id)); }
+  else { ({ error } = await db.from('planos').insert(payload)); }
+  if (error) { $('plano-error').textContent = 'Erro: ' + error.message; show('plano-error'); return; }
   hide('modal-plano');
-  toast(id?'Plano atualizado!':'Plano criado!','success');
+  toast(id ? 'Plano atualizado!' : 'Plano criado!', 'success');
   loadPlanosPage();
 });
 
-function confirmDeleteCliente(id) { deleteTargetId=id; deleteType='cliente'; show('modal-confirm'); }
-function confirmDeletePlano(id) { deleteTargetId=id; deleteType='plano'; show('modal-confirm'); }
+function confirmDeleteCliente(id) { deleteTargetId = id; deleteType = 'cliente'; show('modal-confirm'); }
+function confirmDeletePlano(id) { deleteTargetId = id; deleteType = 'plano'; show('modal-confirm'); }
 
-$('confirm-close').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId=null; });
-$('confirm-cancel').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId=null; });
+$('confirm-close').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId = null; });
+$('confirm-cancel').addEventListener('click', () => { hide('modal-confirm'); deleteTargetId = null; });
 $('confirm-delete').addEventListener('click', async () => {
-  if(!deleteTargetId||!deleteType) return;
-  const tabela = deleteType==='cliente'?'clientes':'planos';
-  const {error} = await db.from(tabela).delete().eq('id', deleteTargetId);
+  if (!deleteTargetId || !deleteType) return;
+  const tabela = deleteType === 'cliente' ? 'clientes' : 'planos';
+  const { error } = await db.from(tabela).delete().eq('id', deleteTargetId);
   hide('modal-confirm');
-  if(error){toast('Erro ao excluir.','error');return;}
-  toast(deleteType==='cliente'?'Cliente excluído.':'Plano excluído.','success');
-  if(deleteType==='cliente'){loadClientes();loadDashboard();}
-  else{loadPlanosPage();}
-  deleteTargetId=null; deleteType=null;
+  if (error) { toast('Erro ao excluir.', 'error'); return; }
+  toast(deleteType === 'cliente' ? 'Cliente excluído.' : 'Plano excluído.', 'success');
+  if (deleteType === 'cliente') { loadClientes(); loadDashboard(); }
+  else { loadPlanosPage(); }
+  deleteTargetId = null; deleteType = null;
 });
 
 // === CONFIGURAÇÕES & 2FA ===
@@ -1085,17 +1087,17 @@ $('config-form').addEventListener('submit', async e => {
     if (senha) updates.password = senha;
 
     const { error: authErr } = await db.auth.updateUser(updates);
-    if (authErr) { 
-      msg.textContent = 'Erro ao atualizar dados da conta: ' + authErr.message; 
-      show('cfg-msg'); 
-      return; 
+    if (authErr) {
+      msg.textContent = 'Erro ao atualizar dados da conta: ' + authErr.message;
+      show('cfg-msg');
+      return;
     }
   }
 
   // Atualiza também na tabela usuarios
   const payload = { nome, usuario, email };
   const { error } = await db.from('usuarios').update(payload).eq('auth_id', currentUser.auth_id);
-  
+
   if (error) { msg.textContent = 'Erro ao atualizar tabela: ' + error.message; show('cfg-msg'); return; }
 
   currentUser = { ...currentUser, ...payload };
@@ -1112,8 +1114,8 @@ $('config-form').addEventListener('submit', async e => {
 $('btn-enable-2fa').addEventListener('click', () => {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   tempSecret2FA = '';
-  for(let i=0; i<32; i++) tempSecret2FA += charset[Math.floor(Math.random() * charset.length)];
-  
+  for (let i = 0; i < 32; i++) tempSecret2FA += charset[Math.floor(Math.random() * charset.length)];
+
   $('twofa-secret-display').textContent = tempSecret2FA;
   $('twofa-verify-code').value = '';
   hide('twofa-setup-error');
@@ -1128,8 +1130,8 @@ $('btn-enable-2fa').addEventListener('click', () => {
   });
   let uri = totp.toString();
 
-  QRCode.toCanvas($('qr-canvas'), uri, { 
-    width: 200, margin: 2, 
+  QRCode.toCanvas($('qr-canvas'), uri, {
+    width: 200, margin: 2,
     color: { dark: '#0a0718', light: '#ffffff' }
   }, function (error) {
     if (error) console.error(error);
@@ -1157,18 +1159,18 @@ $('btn-confirm-2fa').addEventListener('click', async () => {
 
   let delta = totp.validate({ token: code, window: 1 });
   if (delta !== null) {
-    const { error } = await db.from('usuarios').update({ 
-      two_factor_secret: tempSecret2FA, 
-      two_factor_enabled: true 
+    const { error } = await db.from('usuarios').update({
+      two_factor_secret: tempSecret2FA,
+      two_factor_enabled: true
     }).eq('auth_id', currentUser.auth_id);
 
-    if(error) {
+    if (error) {
       err.textContent = 'Erro ao salvar no banco.'; show('twofa-setup-error'); return;
     }
 
     currentUser.two_factor_secret = tempSecret2FA;
     currentUser.two_factor_enabled = true;
-    
+
     hide('modal-2fa-setup');
     populateConfig();
     toast('2FA ativado com sucesso!', 'success');
@@ -1179,18 +1181,18 @@ $('btn-confirm-2fa').addEventListener('click', async () => {
 });
 
 $('btn-disable-2fa').addEventListener('click', async () => {
-  if(!confirm('Deseja realmente desativar o 2FA?')) return;
+  if (!confirm('Deseja realmente desativar o 2FA?')) return;
 
-  const { error } = await db.from('usuarios').update({ 
-    two_factor_secret: null, 
-    two_factor_enabled: false 
+  const { error } = await db.from('usuarios').update({
+    two_factor_secret: null,
+    two_factor_enabled: false
   }).eq('auth_id', currentUser.auth_id);
 
-  if(error) { toast('Erro ao desativar', 'error'); return; }
+  if (error) { toast('Erro ao desativar', 'error'); return; }
 
   currentUser.two_factor_secret = null;
   currentUser.two_factor_enabled = false;
-  
+
   populateConfig();
   toast('2FA desativado.', 'success');
 });
@@ -1249,7 +1251,7 @@ async function loadWhatsApp() {
 async function checkWaConnection() {
   const data = await evoApi(`/instance/connectionState/${INSTANCE_NAME}`);
   const badge = $('wa-status-badge');
-  
+
   if (data && data.instance) {
     const state = data.instance.state;
     if (state === 'open') {
@@ -1278,7 +1280,7 @@ async function checkWaConnection() {
 
 $('btn-wa-connect').addEventListener('click', async () => {
   $('btn-wa-connect').textContent = 'Conectando...';
-  
+
   // Tentar criar instância (se já existir, dará erro, o que é ok)
   await evoApi('/instance/create', 'POST', {
     instanceName: INSTANCE_NAME,
@@ -1300,12 +1302,12 @@ $('btn-wa-connect').addEventListener('click', async () => {
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
     };
-    
+
     // Fica checando o status a cada 3s até conectar
-    if(waCheckInterval) clearInterval(waCheckInterval);
+    if (waCheckInterval) clearInterval(waCheckInterval);
     waCheckInterval = setInterval(async () => {
       await checkWaConnection();
-      if(waStatus === 'conectado') clearInterval(waCheckInterval);
+      if (waStatus === 'conectado') clearInterval(waCheckInterval);
     }, 3000);
   } else if (data && data.instance && data.instance.state === 'open') {
     checkWaConnection();
@@ -1315,7 +1317,7 @@ $('btn-wa-connect').addEventListener('click', async () => {
 });
 
 $('btn-wa-disconnect').addEventListener('click', async () => {
-  if(!confirm('Deseja desconectar esta instância do WhatsApp?')) return;
+  if (!confirm('Deseja desconectar esta instância do WhatsApp?')) return;
   await evoApi(`/instance/logout/${INSTANCE_NAME}`, 'DELETE');
   await checkWaConnection();
   toast('WhatsApp desconectado.', 'info');
@@ -1332,10 +1334,10 @@ async function loadWaConfig() {
     $('wa-auto-time').value = waConfigData.auto_time || '';
     $('wa-auto-interval').value = waConfigData.auto_interval || '1';
     $('wa-auto-active').checked = waConfigData.auto_active || false;
-    
+
     const dAntes = (waConfigData.dias_antes || '').split(',');
     document.querySelectorAll('.wa-cb-antes').forEach(cb => cb.checked = dAntes.includes(cb.value));
-    
+
     const dDepois = (waConfigData.dias_depois || '').split(',');
     document.querySelectorAll('.wa-cb-depois').forEach(cb => cb.checked = dDepois.includes(cb.value));
   } else if (error && error.code === '42P01') {
@@ -1357,7 +1359,7 @@ $('btn-wa-save-msg').addEventListener('click', async () => {
 $('btn-wa-save-auto').addEventListener('click', async () => {
   const diasAntes = Array.from(document.querySelectorAll('.wa-cb-antes:checked')).map(cb => cb.value).join(',');
   const diasDepois = Array.from(document.querySelectorAll('.wa-cb-depois:checked')).map(cb => cb.value).join(',');
-  
+
   const payload = {
     auto_time: $('wa-auto-time').value,
     auto_interval: $('wa-auto-interval').value,
@@ -1384,10 +1386,10 @@ function processWaMessage(template, cliente) {
   msg = msg.replace(/{vencimento}/g, cliente.vencimento ? new Date(cliente.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '');
   msg = msg.replace(/{valor}/g, parseFloat(cliente.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
   msg = msg.replace(/{plano}/g, cliente.plano || '');
-  
+
   const dias = Math.abs(diasAteVencimento(cliente.vencimento));
   msg = msg.replace(/{dias}/g, dias);
-  
+
   return msg;
 }
 
@@ -1395,7 +1397,7 @@ $('btn-wa-preview').addEventListener('click', () => {
   const clienteFake = { nome: 'João Silva', vencimento: new Date().toISOString().split('T')[0], valor: '39.90', plano: 'Mensal' };
   const antes = processWaMessage($('wa-msg-antes').value, clienteFake);
   const apos = processWaMessage($('wa-msg-apos').value, clienteFake);
-  
+
   alert(`=== ANTES ===\n${antes}\n\n=== APÓS ===\n${apos}`);
 });
 
@@ -1409,39 +1411,39 @@ function updateWaManualCount() {
 
 function filterWaClients(filter) {
   return allClientes.filter(c => {
-    if(!c.whatsapp) return false;
-    if(filter === 'todos') return true;
+    if (!c.whatsapp) return false;
+    if (filter === 'todos') return true;
     const dias = diasAteVencimento(c.vencimento);
-    if(filter === 'vencendo_hoje') return dias === 0;
-    if(filter === 'vencidos') return dias < 0;
+    if (filter === 'vencendo_hoje') return dias === 0;
+    if (filter === 'vencidos') return dias < 0;
     return false;
   });
 }
 
 $('btn-wa-send-now').addEventListener('click', () => {
-  if(waStatus !== 'conectado') return toast('WhatsApp não está conectado!', 'error');
+  if (waStatus !== 'conectado') return toast('WhatsApp não está conectado!', 'error');
   const filter = $('wa-manual-filter').value;
   const clients = filterWaClients(filter);
-  if(clients.length === 0) return toast('Nenhum cliente selecionado.', 'info');
-  
+  if (clients.length === 0) return toast('Nenhum cliente selecionado.', 'info');
+
   clients.forEach(c => waQueue.push(c));
   toast(`${clients.length} mensagens enviadas imediatamente.`, 'success');
   startWaQueue();
 });
 
 $('btn-wa-add-queue').addEventListener('click', () => {
-  if(waStatus !== 'conectado') return toast('WhatsApp não está conectado!', 'error');
+  if (waStatus !== 'conectado') return toast('WhatsApp não está conectado!', 'error');
   const filter = $('wa-manual-filter').value;
   const clients = filterWaClients(filter);
-  if(clients.length === 0) return toast('Nenhum cliente selecionado.', 'info');
-  
+  if (clients.length === 0) return toast('Nenhum cliente selecionado.', 'info');
+
   clients.forEach(c => waQueue.push(c));
   updateWaQueueUI();
   toast(`${clients.length} adicionados à fila.`, 'success');
 });
 
 $('btn-wa-pause-queue').addEventListener('click', () => { waIsRunning = false; $('wa-queue-status-text').textContent = 'Pausada'; $('wa-queue-status-text').style.color = 'var(--yellow)'; });
-$('btn-wa-resume-queue').addEventListener('click', () => { if(waQueue.length > 0) startWaQueue(); });
+$('btn-wa-resume-queue').addEventListener('click', () => { if (waQueue.length > 0) startWaQueue(); });
 
 function updateWaQueueUI() {
   $('wa-queue-total').textContent = waQueue.length;
@@ -1461,38 +1463,38 @@ async function startWaQueue() {
 
   const interval = parseInt($('wa-auto-interval').value || 1) * 60000;
 
-  while(waQueue.length > 0 && waIsRunning) {
+  while (waQueue.length > 0 && waIsRunning) {
     const client = waQueue.shift();
     const isVencido = diasAteVencimento(client.vencimento) < 0;
     const template = isVencido ? $('wa-msg-apos').value : $('wa-msg-antes').value;
     const msg = processWaMessage(template, client);
-    
+
     // Disparar
     let phone = client.whatsapp.replace(/\D/g, '');
-    if(!phone.startsWith('55')) phone = '55' + phone;
+    if (!phone.startsWith('55')) phone = '55' + phone;
 
     const reqData = {
       number: phone,
       textMessage: { text: msg }
     };
-    
+
     // If has audio
     const audioUrl = $('wa-msg-audio').value.trim();
     const imageUrl = $('wa-msg-image').value.trim();
 
     try {
       if (imageUrl) {
-        await evoApi('/message/sendMedia/'+INSTANCE_NAME, 'POST', {
+        await evoApi('/message/sendMedia/' + INSTANCE_NAME, 'POST', {
           number: phone,
           options: { delay: 1200 },
           mediaMessage: { mediatype: 'image', fileName: 'imagem.jpg', caption: msg, media: imageUrl }
         });
       } else {
-        await evoApi('/message/sendText/'+INSTANCE_NAME, 'POST', reqData);
+        await evoApi('/message/sendText/' + INSTANCE_NAME, 'POST', reqData);
       }
-      
+
       if (audioUrl) {
-        await evoApi('/message/sendWhatsAppAudio/'+INSTANCE_NAME, 'POST', {
+        await evoApi('/message/sendWhatsAppAudio/' + INSTANCE_NAME, 'POST', {
           number: phone,
           options: { delay: 2000 },
           audioMessage: { audio: audioUrl }
@@ -1510,15 +1512,15 @@ async function startWaQueue() {
     $('wa-queue-sent').textContent = waSentCount;
     $('wa-queue-total').textContent = waTotalCount;
     $('wa-queue-progress').style.width = Math.min(100, (waSentCount / waTotalCount) * 100) + '%';
-    
+
     if (waQueue.length > 0 && waIsRunning) {
-      logWaQueue(`Aguardando ${interval/1000}s para o próximo...`);
+      logWaQueue(`Aguardando ${interval / 1000}s para o próximo...`);
       await new Promise(r => setTimeout(r, interval));
     }
   }
 
   waIsRunning = false;
-  if(waQueue.length === 0) {
+  if (waQueue.length === 0) {
     $('wa-queue-status-text').textContent = 'Concluído';
     waSentCount = 0; waTotalCount = 0;
   } else {
@@ -1576,20 +1578,20 @@ function filterWaHistoryTable() {
   trs.forEach(tr => {
     const dataTxt = tr.children[3].textContent; // Data
     const statusTxt = tr.children[4].textContent.trim(); // Status
-    
+
     let showRow = true;
-    if(sFilter && statusTxt !== sFilter) showRow = false;
-    
-    if(dFilter) {
+    if (sFilter && statusTxt !== sFilter) showRow = false;
+
+    if (dFilter) {
       const dFmt = dFilter.split('-').reverse().join('/'); // YYYY-MM-DD -> DD/MM/YYYY
-      if(!dataTxt.includes(dFmt)) showRow = false;
+      if (!dataTxt.includes(dFmt)) showRow = false;
     }
 
-    if(showRow) { tr.style.display = ''; visibleCount++; }
+    if (showRow) { tr.style.display = ''; visibleCount++; }
     else tr.style.display = 'none';
   });
 
-  if(visibleCount === 0) show('wa-history-empty');
+  if (visibleCount === 0) show('wa-history-empty');
   else hide('wa-history-empty');
 }
 
@@ -1598,5 +1600,5 @@ function filterWaHistoryTable() {
 document.addEventListener('DOMContentLoaded', () => {
   // Garantia extra: esconde o splash se algo der muito errado após 3 segundos
   setTimeout(() => hide('splash'), 3000);
-  boot();
+  // boot() já é chamado no window.onload
 });
