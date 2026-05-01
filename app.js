@@ -98,6 +98,7 @@ async function boot() {
 
     // Se não houver nenhum usuário criado
     if (!usersErr && (!usersData || usersData.length === 0)) {
+      hide('login-screen');
       show('setup-screen');
       return;
     }
@@ -110,9 +111,11 @@ async function boot() {
 
         if (currentUser.two_factor_enabled) {
           tempLoginUser = currentUser;
+          hide('login-screen');
           show('twofa-screen');
           $('twofa-code').focus();
         } else {
+          hide('login-screen');
           enterApp();
         }
         return;
@@ -472,6 +475,9 @@ $('form-reset').addEventListener('submit', async e => {
 function enterApp() {
   try {
     console.log('Entering App Layout...');
+    hide('login-screen');
+    hide('setup-screen');
+    hide('twofa-screen');
     show('app');
     $('sidebar-nome').textContent = currentUser.nome || currentUser.email;
     $('sidebar-avatar').textContent = (currentUser.nome || currentUser.email).charAt(0).toUpperCase();
