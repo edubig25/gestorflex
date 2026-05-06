@@ -99,7 +99,7 @@
       <a href="#" class="nav-item" data-page="planos"><span class="nav-icon">🏷️</span><span class="nav-label">Planos</span></a>
       <a href="#" class="nav-item" data-page="whatsapp"><span class="nav-icon" style="color: #25D366;">💬</span><span class="nav-label">WhatsApp</span></a>
       <a href="#" class="nav-item" data-page="configuracoes"><span class="nav-icon">⚙️</span><span class="nav-label">Configurações</span></a>
-<a href="#" class="nav-item" data-page="meta-ads"><span class="nav-icon">📊</span><span class="nav-label">Meta Ads</span></a>
+      <a href="#" class="nav-item" data-page="meta-ads"><span class="nav-icon" style="color: #0668E1;">🎯</span><span class="nav-label">Meta Ads</span></a>
     </nav>
     <div class="sidebar-footer">
       <div class="user-avatar-wrap">
@@ -516,8 +516,66 @@
           </div>
         </div>
 
+        </div>
       </div>
     </div>
+
+    <!-- META ADS -->
+    <div id="page-meta-ads" class="page">
+      <div class="page-header">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <h1>Meta Ads</h1>
+          <div class="status-badge red" id="meta-status-badge">Desconectado</div>
+        </div>
+        <p>Integração com API de Marketing do Meta</p>
+      </div>
+
+      <div class="dash-grid wa-main-grid">
+        <!-- CONEXÃO -->
+        <div class="card">
+          <div class="card-header"><h3>⚙️ Conexão Meta Ads</h3></div>
+          <div class="auth-form" style="max-width: 600px;">
+            <div class="field-group">
+              <label>Access Token (User/System)</label>
+              <input type="password" id="meta-access-token" placeholder="EAA..." autocomplete="new-password">
+            </div>
+            <div class="field-group">
+              <label>Ad Account ID (act_...)</label>
+              <input type="text" id="meta-ad-account" placeholder="act_123456789">
+            </div>
+            <div style="display:flex; gap:10px; margin-top: 10px;">
+              <button class="btn-primary" id="btn-meta-connect" style="background: #0668E1; color: #fff; box-shadow: 0 4px 24px rgba(6,104,225,0.3);">Conectar / Salvar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DASHBOARD (Só visível quando conectado) -->
+        <div id="meta-dashboard" class="hidden">
+           <div class="metrics-grid" style="margin-bottom:20px;">
+              <div class="metric-card purple"><div class="metric-icon">💸</div><div class="metric-info"><span class="metric-label">Gasto (Hoje)</span><span class="metric-value" id="meta-spend-hoje">R$ 0,00</span></div></div>
+              <div class="metric-card yellow"><div class="metric-icon">💰</div><div class="metric-info"><span class="metric-label">Gasto (Mês)</span><span class="metric-value" id="meta-spend-mes">R$ 0,00</span></div></div>
+              <div class="metric-card green"><div class="metric-icon">🎯</div><div class="metric-info"><span class="metric-label">Custo por Lead (Mês)</span><span class="metric-value" id="meta-cpl">R$ 0,00</span></div></div>
+              <div class="metric-card"><div class="metric-icon">🖱️</div><div class="metric-info"><span class="metric-label">Cliques (Mês)</span><span class="metric-value" id="meta-cliques">0</span></div></div>
+           </div>
+
+           <div class="card">
+              <div class="card-header">
+                  <h3>📢 Campanhas Ativas/Pausadas</h3>
+                  <button class="btn-primary" id="btn-meta-nova-campanha" style="background: #0668E1; padding: 6px 12px; font-size: 0.85rem;">+ Nova Campanha</button>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>Status</th><th>Campanha</th><th>Objetivo</th><th>Orçamento Diário</th><th>Gasto</th><th>Resultados</th><th>Ações</th></tr></thead>
+                  <tbody id="tbody-meta-campanhas"></tbody>
+                </table>
+                <div id="meta-campanhas-empty" class="empty-state hidden">Nenhuma campanha encontrada.</div>
+              </div>
+           </div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 </div>
 

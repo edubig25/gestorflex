@@ -203,6 +203,15 @@ CREATE TABLE IF NOT EXISTS wa_historico (
   mensagem text, status text, created_at timestamptz default now()
 );
 ALTER TABLE wa_historico DISABLE ROW LEVEL SECURITY;
+
+-- Tabela Meta Config
+CREATE TABLE IF NOT EXISTS meta_config (
+  id bigserial primary key,
+  access_token text,
+  ad_account_id text,
+  created_at timestamptz default now()
+);
+ALTER TABLE meta_config DISABLE ROW LEVEL SECURITY;
 </pre>
       </div>
       <button onclick="location.reload()" style="width:100%;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;border:none;border-radius:10px;padding:13px;font-size:.95rem;font-weight:600;cursor:pointer;box-shadow:0 4px 24px rgba(124,58,237,.4)">✅ Já executei o SQL — Recarregar</button>
@@ -518,7 +527,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
 function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
-  const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', whatsapp: 'WhatsApp', configuracoes: 'Configurações' };
+  const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', whatsapp: 'WhatsApp', configuracoes: 'Configurações', 'meta-ads': 'Meta Ads' };
   $('topbar-title').textContent = titles[page] || '';
   if (page === 'clientes') loadClientes();
   if (page === 'financeiro') loadFinanceiro();
@@ -526,6 +535,7 @@ function navigateTo(page) {
   if (page === 'planos') loadPlanosPage();
   if (page === 'whatsapp') loadWhatsApp();
   if (page === 'configuracoes') populateConfig();
+  if (page === 'meta-ads') loadMetaAds();
 }
 
 $('menu-toggle').addEventListener('click', () => $('sidebar').classList.toggle('open'));
@@ -1741,6 +1751,203 @@ function filterWaHistoryTable() {
   if (visibleCount === 0) show('wa-history-empty');
   else hide('wa-history-empty');
 }
+
+// === META ADS MODULE ===
+let metaConfigData = null;
+
+async function loadMetaAds() {
+  await loadMetaConfig();
+  if (metaConfigData && metaConfigData.access_token && metaConfigData.ad_account_id) {
+    $('meta-status-badge').textContent = 'Conectado';
+    $('meta-status-badge').className = 'status-badge green';
+    show('meta-dashboard');
+    await fetchMetaMetrics();
+    await fetchMetaCampaigns();
+  } else {
+    $('meta-status-badge').textContent = 'Desconectado';
+    $('meta-status-badge').className = 'status-badge red';
+    hide('meta-dashboard');
+  }
+}
+
+async function loadMetaConfig() {
+  const { data, error } = await db.from('meta_config').select('*').limit(1);
+  if (!error && data && data.length > 0) {
+    metaConfigData = data[0];
+    $('meta-access-token').value = metaConfigData.access_token || '';
+    $('meta-ad-account').value = metaConfigData.ad_account_id || '';
+  } else if (error && error.code === '42P01') {
+    toast('Tabela meta_config não existe. Execute o SQL de configuração.', 'error');
+  }
+}
+
+$('btn-meta-connect')?.addEventListener('click', async () => {
+  const token = $('meta-access-token').value.trim();
+  let actId = $('meta-ad-account').value.trim();
+  if (!token || !actId) {
+    return toast('Preencha o Token e o Ad Account ID', 'error');
+  }
+  if (!actId.startsWith('act_')) {
+    actId = 'act_' + actId;
+    $('meta-ad-account').value = actId;
+  }
+
+  const payload = { access_token: token, ad_account_id: actId };
+  if (metaConfigData && metaConfigData.id) {
+    await db.from('meta_config').update(payload).eq('id', metaConfigData.id);
+  } else {
+    const { data } = await db.from('meta_config').insert(payload).select();
+    if (data && data.length > 0) metaConfigData = data[0];
+  }
+  
+  toast('Configuração Meta salva!', 'success');
+  loadMetaAds();
+});
+
+async function apiMeta(endpoint, method = 'GET', params = {}) {
+  if (!metaConfigData || !metaConfigData.access_token) return null;
+  const baseUrl = 'https://graph.facebook.com/v19.0';
+  let url = `${baseUrl}${endpoint}?access_token=${metaConfigData.access_token}`;
+  
+  if (method === 'GET') {
+    const q = new URLSearchParams(params).toString();
+    if (q) url += `&${q}`;
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      return json;
+    } catch (e) {
+      toast('Erro Meta API: ' + e.message, 'error');
+      return null;
+    }
+  } else {
+    try {
+      const form = new URLSearchParams();
+      Object.keys(params).forEach(k => form.append(k, params[k]));
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString()
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      return json;
+    } catch (e) {
+      toast('Erro Meta API: ' + e.message, 'error');
+      return null;
+    }
+  }
+}
+
+async function fetchMetaMetrics() {
+  if (!metaConfigData) return;
+  const actId = metaConfigData.ad_account_id;
+  
+  // Gastos Hoje
+  const resHoje = await apiMeta(`/${actId}/insights`, 'GET', { date_preset: 'today', fields: 'spend' });
+  let spendHoje = 0;
+  if (resHoje && resHoje.data && resHoje.data.length > 0) spendHoje = parseFloat(resHoje.data[0].spend);
+  $('meta-spend-hoje').textContent = fmt(spendHoje);
+
+  // Métricas do Mês
+  const resMes = await apiMeta(`/${actId}/insights`, 'GET', { date_preset: 'this_month', fields: 'spend,clicks,impressions,cpc,cpm,actions' });
+  if (resMes && resMes.data && resMes.data.length > 0) {
+    const d = resMes.data[0];
+    $('meta-spend-mes').textContent = fmt(d.spend);
+    $('meta-cliques').textContent = d.clicks || 0;
+    
+    // CPL Aproximado (procurar leads nas actions)
+    let leads = 0;
+    if (d.actions) {
+      const leadAction = d.actions.find(a => a.action_type === 'lead');
+      if (leadAction) leads = parseInt(leadAction.value);
+    }
+    const cpl = leads > 0 ? parseFloat(d.spend) / leads : 0;
+    $('meta-cpl').textContent = fmt(cpl);
+  } else {
+    $('meta-spend-mes').textContent = fmt(0);
+    $('meta-cliques').textContent = 0;
+    $('meta-cpl').textContent = fmt(0);
+  }
+}
+
+async function fetchMetaCampaigns() {
+  if (!metaConfigData) return;
+  const actId = metaConfigData.ad_account_id;
+  const res = await apiMeta(`/${actId}/campaigns`, 'GET', { fields: 'id,name,status,objective,daily_budget,insights{spend,clicks,actions}' });
+  
+  const tbody = $('tbody-meta-campanhas');
+  if (!res || !res.data || res.data.length === 0) {
+    tbody.innerHTML = '';
+    show('meta-campanhas-empty');
+    return;
+  }
+  hide('meta-campanhas-empty');
+
+  tbody.innerHTML = res.data.map(c => {
+    let spend = 0, results = 0;
+    if (c.insights && c.insights.data && c.insights.data.length > 0) {
+      spend = c.insights.data[0].spend || 0;
+      if (c.insights.data[0].actions) {
+        const resAction = c.insights.data[0].actions.find(a => ['lead', 'link_click', 'post_engagement'].includes(a.action_type));
+        if (resAction) results = resAction.value;
+      }
+    }
+    
+    const budget = c.daily_budget ? fmt(c.daily_budget / 100) : 'Vitalício';
+    
+    // Status Badge
+    let bClass = 'badge-pendente';
+    let bTxt = c.status;
+    if (c.status === 'ACTIVE') { bClass = 'badge-ativo'; bTxt = 'Ativa'; }
+    if (c.status === 'PAUSED') { bClass = 'badge-vencido'; bTxt = 'Pausada'; }
+    
+    const toggleAction = c.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+    const toggleLabel = c.status === 'ACTIVE' ? 'Pausar' : 'Ativar';
+    
+    return \`<tr>
+      <td><span class="badge \${bClass}">\${bTxt}</span></td>
+      <td><strong>\${c.name}</strong></td>
+      <td>\${c.objective || '—'}</td>
+      <td style="cursor:pointer; color:var(--purple-light); text-decoration:underline;" onclick="metaUpdateBudget('\${c.id}', '\${c.name}', \${c.daily_budget || 0})">\${budget} ✏️</td>
+      <td>\${fmt(spend)}</td>
+      <td>\${results} (aprox)</td>
+      <td>
+        <button class="action-btn action-edit" onclick="metaToggleStatus('\${c.id}', '\${toggleAction}')">\${toggleLabel}</button>
+      </td>
+    </tr>\`;
+  }).join('');
+}
+
+window.metaToggleStatus = async (campaignId, status) => {
+  $('toast').textContent = 'Alterando status...'; show('toast');
+  const res = await apiMeta(\`/\${campaignId}\`, 'POST', { status });
+  if (res) {
+    toast('Status atualizado!', 'success');
+    fetchMetaCampaigns();
+  }
+};
+
+window.metaUpdateBudget = async (campaignId, name, currentBudget) => {
+  if (!currentBudget) return toast('Campanhas com orçamento vitalício devem ser alteradas no Meta.', 'info');
+  const currentFmt = (currentBudget / 100).toFixed(2);
+  const novo = prompt(\`Novo orçamento diário para "\${name}" (em R$):\`, currentFmt);
+  if (!novo) return;
+  const num = parseFloat(novo.replace(',','.'));
+  if (isNaN(num) || num <= 0) return toast('Valor inválido', 'error');
+  
+  const budgetCents = Math.round(num * 100);
+  const res = await apiMeta(\`/\${campaignId}\`, 'POST', { daily_budget: budgetCents });
+  if (res) {
+    toast('Orçamento atualizado!', 'success');
+    fetchMetaCampaigns();
+  }
+};
+
+$('btn-meta-nova-campanha')?.addEventListener('click', async () => {
+  toast('Para criar campanhas, use o Gerenciador de Anúncios do Meta para mais opções e precisão.', 'info');
+});
 
 // Inicia o app ao final de todos os scripts
 // Inicia o app assim que o DOM estiver pronto
