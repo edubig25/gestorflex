@@ -624,5 +624,68 @@
 <div id="toast" class="toast hidden"></div>
 <footer class="app-footer">Gestor Flex © 2025 — Todos os direitos reservados</footer>
 <script src="app.js"></script>
+<style>
+/* Modern login screen design */
+.auth-screen {
+  background: linear-gradient(135deg, rgba(124,58,237,0.15), transparent 50%), radial-gradient(135deg, rgba(16,185,129,0.1), transparent 50%), var(--bg);
+  padding: 32px 24px;
+}
+.auth-card {
+  background: rgba(255,255,255,0.08);
+  border-radius: 20px;
+  backdrop-filter: blur(12px);
+  border: none;
+  padding: 36px 32px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.5);
+  animation: none;
+}
+.auth-title {
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, var(--purple-light), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+.auth-sub {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+.auth-form {
+  gap: 18px;
+}
+.field-group {
+  gap: 10px;
+}
+.field-group label {
+  font-size: 0.95rem;
+}
+.field-group input,
+.field-group select {
+  background: rgba(13,10,26,0.85);
+  border: 1px solid rgba(124,58,237,0.3);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 1rem;
+}
+.field-group input:focus,
+.field-group select:focus {
+  border-color: var(--purple-light);
+  box-shadow: 0 0 0 4px rgba(124,58,237,0.2);
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+  color: #fff;
+  border-radius: 10px;
+  padding: 12px 28px;
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124,58,237,0.3);
+}
+</style>
 </body>
+</html></body>
 </html>
