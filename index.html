@@ -119,6 +119,48 @@
     <!-- DASHBOARD -->
     <div id="page-dashboard" class="page active">
       <div class="page-header"><h1>Dashboard</h1><p>Visão geral da sua operação</p></div>
+
+      <!-- CAIXA ATUAL (Cobrei-style) -->
+      <div class="caixa-hero-card">
+        <div class="caixa-hero-left">
+          <div class="caixa-hero-label">💰 Caixa Atual</div>
+          <div class="caixa-hero-value" id="caixa-valor">—</div>
+          <div class="caixa-hero-sub">Receita confirmada do mês</div>
+        </div>
+        <div class="caixa-hero-right">
+          <div class="caixa-pill green">
+            <span class="caixa-pill-dot"></span>
+            <div>
+              <div class="caixa-pill-label">✅ Recebido</div>
+              <div class="caixa-pill-val" id="caixa-recebido">—</div>
+            </div>
+          </div>
+          <div class="caixa-pill yellow">
+            <span class="caixa-pill-dot"></span>
+            <div>
+              <div class="caixa-pill-label">⏳ A Receber</div>
+              <div class="caixa-pill-val" id="caixa-pendente">—</div>
+            </div>
+          </div>
+          <div class="caixa-pill red">
+            <span class="caixa-pill-dot"></span>
+            <div>
+              <div class="caixa-pill-label">🔴 Inadimplente</div>
+              <div class="caixa-pill-val" id="caixa-vencido">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="caixa-bar-wrap">
+          <div class="caixa-bar-label">
+            <span>Adimplência do mês</span>
+            <span id="caixa-pct">—%</span>
+          </div>
+          <div class="caixa-bar-track">
+            <div class="caixa-bar-fill" id="caixa-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="metrics-grid">
         <div class="metric-card"><div class="metric-icon">👥</div><div class="metric-info"><span class="metric-label">Total de Clientes</span><span class="metric-value" id="m-total">—</span></div></div>
         <div class="metric-card green"><div class="metric-icon">✅</div><div class="metric-info"><span class="metric-label">Clientes Ativos</span><span class="metric-value" id="m-ativos">—</span></div></div>

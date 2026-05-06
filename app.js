@@ -534,10 +534,51 @@ $('menu-toggle').addEventListener('click', () => $('sidebar').classList.toggle('
 async function loadDashboard() {
   const { data } = await db.from('clientes').select('*');
   allClientes = data || [];
+  renderCaixaAtual(allClientes);
   renderDashMetrics(allClientes);
   renderChartReceita(allClientes);
   renderListaVencendo(allClientes);
   checkNotifVencendo(allClientes);
+}
+
+function renderCaixaAtual(clientes) {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const mes = hoje.getMonth();
+  const ano = hoje.getFullYear();
+
+  // Recebido: clientes Ativos com vencimento no mês atual
+  const recebido = clientes
+    .filter(c => c.status === 'Ativo' && c.vencimento)
+    .filter(c => {
+      const v = new Date(c.vencimento + 'T00:00:00');
+      return v.getMonth() === mes && v.getFullYear() === ano;
+    })
+    .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+
+  // A Receber: clientes Pendentes
+  const pendente = clientes
+    .filter(c => c.status === 'Pendente')
+    .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+
+  // Inadimplente: clientes Vencidos
+  const vencido = clientes
+    .filter(c => c.status === 'Vencido')
+    .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+
+  const totalPotencial = recebido + pendente + vencido;
+  const pct = totalPotencial > 0 ? Math.round((recebido / totalPotencial) * 100) : 0;
+
+  $('caixa-valor').textContent = fmt(recebido);
+  $('caixa-recebido').textContent = fmt(recebido);
+  $('caixa-pendente').textContent = fmt(pendente);
+  $('caixa-vencido').textContent = fmt(vencido);
+  $('caixa-pct').textContent = pct + '%';
+
+  const bar = $('caixa-bar');
+  if (bar) {
+    bar.style.width = '0%';
+    setTimeout(() => { bar.style.width = pct + '%'; }, 120);
+  }
 }
 
 function renderDashMetrics(clientes) {

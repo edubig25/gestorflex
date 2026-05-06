@@ -397,3 +397,144 @@ select.cobrei-input option {
 .nav-item:active {
   transform: scale(0.98);
 }
+
+/* === CAIXA ATUAL (Cobrei-style hero card) === */
+.caixa-hero-card {
+  background: linear-gradient(135deg, #12213a 0%, #0f1c30 50%, #101826 100%);
+  border: 1px solid rgba(124,58,237,0.35);
+  border-radius: 20px;
+  padding: 28px 32px 24px;
+  margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 20px 32px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 60px rgba(124,58,237,0.08);
+}
+.caixa-hero-card::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.caixa-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.caixa-hero-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.caixa-hero-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 2.8rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+  letter-spacing: -1px;
+}
+.caixa-hero-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.caixa-hero-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  min-width: 210px;
+}
+.caixa-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 10px 14px;
+  transition: background 0.2s;
+}
+.caixa-pill:hover { background: rgba(255,255,255,0.07); }
+.caixa-pill-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.caixa-pill.green .caixa-pill-dot { background: #10B981; box-shadow: 0 0 8px rgba(16,185,129,0.6); }
+.caixa-pill.yellow .caixa-pill-dot { background: #F59E0B; box-shadow: 0 0 8px rgba(245,158,11,0.6); }
+.caixa-pill.red .caixa-pill-dot { background: #EF4444; box-shadow: 0 0 8px rgba(239,68,68,0.6); }
+.caixa-pill-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.caixa-pill-val {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.caixa-pill.green .caixa-pill-val { color: #34d399; }
+.caixa-pill.yellow .caixa-pill-val { color: #fbbf24; }
+.caixa-pill.red .caixa-pill-val { color: #f87171; }
+
+/* Progress bar — spans full width below */
+.caixa-bar-wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.caixa-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.caixa-bar-label span:last-child {
+  color: #34d399;
+  font-weight: 700;
+}
+.caixa-bar-track {
+  height: 7px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.caixa-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10B981, #34d399);
+  border-radius: 99px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 12px rgba(16,185,129,0.5);
+}
+
+/* Responsive Caixa */
+@media(max-width:900px) {
+  .caixa-hero-card {
+    grid-template-columns: 1fr;
+  }
+  .caixa-hero-right {
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-width: unset;
+  }
+  .caixa-pill { flex: 1; min-width: 140px; }
+  .caixa-hero-value { font-size: 2.2rem; }
+}
+@media(max-width:600px) {
+  .caixa-hero-card { padding: 20px 18px 18px; }
+  .caixa-hero-value { font-size: 1.9rem; }
+  .caixa-hero-right { flex-direction: column; }
+  .caixa-pill { min-width: unset; }
+}
