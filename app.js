@@ -332,53 +332,6 @@ $('login-form').addEventListener('submit', async e => {
   }
 });
 
-    if (authErr) {
-      alert('Erro de Autenticação: ' + authErr.message);
-      btn.textContent = originalText;
-      btn.disabled = false;
-      err.textContent = 'E-mail ou senha incorretos.';
-      show('login-error');
-      return;
-    }
-
-    if (!authData.user) {
-      alert('Erro: Login bem sucedido mas usuário não retornado.');
-      btn.textContent = originalText;
-      btn.disabled = false;
-      return;
-    }
-
-    alert('Sucesso no Auth! Buscando seus dados...');
-    // Busca dados adicionais do usuário
-    const { data: customUser, error: dbErr } = await db.from('usuarios').select('*').eq('auth_id', authData.user.id).single();
-
-    if (dbErr || !customUser) {
-      alert('Usuário não encontrado na tabela "usuarios".');
-      btn.textContent = originalText;
-      btn.disabled = false;
-      err.textContent = 'Usuário não encontrado na base de dados.';
-      show('login-error');
-      return;
-    }
-
-    const user = { ...authData.user, ...customUser };
-    alert('Tudo pronto! Entrando no sistema...');
-
-    if (user.two_factor_enabled) {
-      tempLoginUser = user;
-      hide('login-screen');
-      show('twofa-screen');
-      $('twofa-code').value = '';
-      $('twofa-code').focus();
-    } else {
-      finishLogin(user);
-    }
-  } catch (error) {
-    alert('Erro fatal no login: ' + error.message);
-    console.error('Login error:', error);
-  }
-});
-
 // === 2FA LOGIN VERIFICATION ===
 $('twofa-form').addEventListener('submit', e => {
   e.preventDefault();
