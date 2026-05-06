@@ -532,28 +532,30 @@ $('menu-toggle').addEventListener('click', () => $('sidebar').classList.toggle('
 
 // === DASHBOARD ===
 async function loadDashboard() {
-  const { data } = await db.from('clientes').select('*');
-  allClientes = data || [];
-  renderCaixaAtual(allClientes);
+  const [{ data: clientes }, { data: pagamentos }] = await Promise.all([
+    db.from('clientes').select('*'),
+    db.from('pagamentos').select('*')
+  ]);
+  allClientes = clientes || [];
+  renderCaixaAtual(allClientes, pagamentos || []);
   renderDashMetrics(allClientes);
   renderChartReceita(allClientes);
   renderListaVencendo(allClientes);
   checkNotifVencendo(allClientes);
 }
 
-function renderCaixaAtual(clientes) {
+function renderCaixaAtual(clientes, pagamentos = []) {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const mes = hoje.getMonth();
   const ano = hoje.getFullYear();
 
-  // Recebido: clientes Ativos com vencimento no mês atual
-  const recebido = clientes
-    .filter(c => c.status === 'Ativo' && c.vencimento)
-    .filter(c => {
-      const v = new Date(c.vencimento + 'T00:00:00');
-      return v.getMonth() === mes && v.getFullYear() === ano;
+  // Caixa real: soma dos pagamentos registrados no mês atual
+  const caixaReal = pagamentos
+    .filter(p => {
+      const d = new Date(p.data_pagamento + 'T00:00:00');
+      return d.getMonth() === mes && d.getFullYear() === ano;
     })
-    .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+    .reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
 
   // A Receber: clientes Pendentes
   const pendente = clientes
@@ -565,11 +567,11 @@ function renderCaixaAtual(clientes) {
     .filter(c => c.status === 'Vencido')
     .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
 
-  const totalPotencial = recebido + pendente + vencido;
-  const pct = totalPotencial > 0 ? Math.round((recebido / totalPotencial) * 100) : 0;
+  const totalPotencial = caixaReal + pendente + vencido;
+  const pct = totalPotencial > 0 ? Math.round((caixaReal / totalPotencial) * 100) : 0;
 
-  $('caixa-valor').textContent = fmt(recebido);
-  $('caixa-recebido').textContent = fmt(recebido);
+  $('caixa-valor').textContent = fmt(caixaReal);
+  $('caixa-recebido').textContent = fmt(caixaReal);
   $('caixa-pendente').textContent = fmt(pendente);
   $('caixa-vencido').textContent = fmt(vencido);
   $('caixa-pct').textContent = pct + '%';
@@ -810,14 +812,45 @@ $('form-cliente').addEventListener('submit', async e => {
     $('form-error').textContent = 'Preencha os campos obrigatórios.';
     show('form-error'); return;
   }
-  let error;
-  if (id) { ({ error } = await db.from('clientes').update(payload).eq('id', id)); }
-  else { ({ error } = await db.from('clientes').insert(payload)); }
+  let error, insertedData;
+  if (id) {
+    ({ error } = await db.from('clientes').update(payload).eq('id', id));
+  } else {
+    ({ data: insertedData, error } = await db.from('clientes').insert(payload).select().single());
+  }
   if (error) { $('form-error').textContent = 'Erro: ' + error.message; show('form-error'); return; }
+
+  // Registra pagamento ao adicionar novo cliente Ativo
+  if (!id && payload.status === 'Ativo' && payload.valor > 0) {
+    await registrarPagamento({
+      cliente_id: insertedData?.id || null,
+      cliente_nome: payload.nome,
+      valor: payload.valor,
+      plano: payload.plano,
+      tipo: 'novo'
+    });
+  }
+
   closeModal();
   toast(id ? 'Cliente atualizado!' : 'Cliente adicionado!', 'success');
   loadClientes(); loadDashboard();
 });
+
+// === REGISTRAR PAGAMENTO ===
+async function registrarPagamento({ cliente_id, cliente_nome, valor, plano, tipo = 'renovacao', observacao = null }) {
+  const hoje = new Date().toISOString().split('T')[0];
+  const { error } = await db.from('pagamentos').insert({
+    cliente_id,
+    cliente_nome,
+    valor,
+    plano,
+    tipo,
+    data_pagamento: hoje,
+    observacao
+  });
+  if (error) console.error('Erro ao registrar pagamento:', error.message);
+  return !error;
+}
 
 async function renovar(id) {
   const c = allClientes.find(x => x.id === id);
@@ -826,7 +859,18 @@ async function renovar(id) {
   const novaData = addMeses(base, planoMeses(c.plano));
   const { error } = await db.from('clientes').update({ vencimento: novaData, status: 'Ativo' }).eq('id', id);
   if (error) { toast('Erro ao renovar: ' + error.message, 'error'); return; }
-  toast('Plano renovado até ' + new Date(novaData + 'T00:00:00').toLocaleDateString('pt-BR'), 'success');
+
+  // Registra o pagamento desta renovação
+  await registrarPagamento({
+    cliente_id: c.id,
+    cliente_nome: c.nome,
+    valor: c.valor,
+    plano: c.plano,
+    tipo: 'renovacao',
+    observacao: 'Renovação manual — novo venc: ' + new Date(novaData + 'T00:00:00').toLocaleDateString('pt-BR')
+  });
+
+  toast('✅ Plano renovado até ' + new Date(novaData + 'T00:00:00').toLocaleDateString('pt-BR') + ' — Pagamento registrado!', 'success');
   loadClientes();
   loadDashboard();
 }
@@ -834,21 +878,24 @@ async function renovar(id) {
 // === FINANCEIRO ===
 
 async function loadFinanceiro() {
-  const { data } = await db.from('clientes').select('*');
-  const clientes = data || [];
+  const [{ data: clientesData }, { data: pagamentosData }] = await Promise.all([
+    db.from('clientes').select('*'),
+    db.from('pagamentos').select('*').order('data_pagamento', { ascending: false })
+  ]);
+  const clientes = clientesData || [];
+  const pagamentos = pagamentosData || [];
+
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const mes = hoje.getMonth(); const ano = hoje.getFullYear();
-  const periodo = parseInt($('fin-period')?.value || 6);
 
   const ativos = clientes.filter(c => c.status === 'Ativo');
   const vencidos = clientes.filter(c => c.status === 'Vencido' || diasAteVencimento(c.vencimento) < 0);
   const pendentes = clientes.filter(c => c.status === 'Pendente');
 
-  const receitaMes = ativos.filter(c => {
-    if (!c.vencimento) return false;
-    const v = new Date(c.vencimento + 'T00:00:00');
-    return v.getMonth() === mes && v.getFullYear() === ano;
-  }).reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  // Receita real do mês = pagamentos registrados este mês
+  const receitaMes = pagamentos
+    .filter(p => { const d = new Date(p.data_pagamento + 'T00:00:00'); return d.getMonth() === mes && d.getFullYear() === ano; })
+    .reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
 
   const emAberto = clientes.filter(c => c.status !== 'Ativo').reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
 
@@ -857,10 +904,16 @@ async function loadFinanceiro() {
   $('fin-em-aberto').textContent = fmt(emAberto);
   $('fin-vencidos-count').textContent = vencidos.length;
 
-  // CHART 1: Line - Receita vs Inadimplência por mês
+  // CHART 1: Receita real (pagamentos) vs Inadimplência por mês
   const meses = getUltimos6Meses();
-  const valReceita = meses.map(m => clientes.filter(c => c.status === 'Ativo' && c.vencimento && new Date(c.vencimento + 'T00:00:00').getMonth() === m.mes && new Date(c.vencimento + 'T00:00:00').getFullYear() === m.ano).reduce((a, c) => a + parseFloat(c.valor || 0), 0));
-  const valVencidos = meses.map(m => clientes.filter(c => c.status !== 'Ativo' && c.vencimento && new Date(c.vencimento + 'T00:00:00').getMonth() === m.mes && new Date(c.vencimento + 'T00:00:00').getFullYear() === m.ano).reduce((a, c) => a + parseFloat(c.valor || 0), 0));
+  const valReceita = meses.map(m =>
+    pagamentos.filter(p => { const d = new Date(p.data_pagamento + 'T00:00:00'); return d.getMonth() === m.mes && d.getFullYear() === m.ano; })
+      .reduce((a, p) => a + parseFloat(p.valor || 0), 0)
+  );
+  const valVencidos = meses.map(m =>
+    clientes.filter(c => c.status !== 'Ativo' && c.vencimento && new Date(c.vencimento + 'T00:00:00').getMonth() === m.mes && new Date(c.vencimento + 'T00:00:00').getFullYear() === m.ano)
+      .reduce((a, c) => a + parseFloat(c.valor || 0), 0)
+  );
 
   const ctx1 = $('chart-fin-fluxo').getContext('2d');
   if (chartFinFluxo) chartFinFluxo.destroy();
@@ -878,7 +931,6 @@ async function loadFinanceiro() {
   if (chartFinStatus) chartFinStatus.destroy();
   chartFinStatus = new Chart(ctx2, { type: 'doughnut', data: { labels: ['Ativos', 'Vencidos', 'Pendentes'], datasets: [{ data: [ativos.length, vencidos.length, pendentes.length], backgroundColor: ['#10B981', '#EF4444', '#F59E0B'], borderWidth: 2, borderColor: '#1E1838', hoverOffset: 8 }] }, options: { responsive: false, plugins: { legend: { display: false } }, cutout: '68%' } });
 
-  // Legend for donut
   const total = clientes.length || 1;
   $('fin-status-legend').innerHTML = [
     { label: 'Ativos', val: ativos.length, color: '#10B981' },
@@ -886,9 +938,10 @@ async function loadFinanceiro() {
     { label: 'Pendentes', val: pendentes.length, color: '#F59E0B' }
   ].map(i => `<div class="fin-legend-item"><span class="fin-legend-dot" style="background:${i.color}"></span><span class="fin-legend-label">${i.label}</span><span class="fin-legend-val">${i.val} (${Math.round(i.val / total * 100)}%)</span></div>`).join('');
 
-  // CHART 3: Bar - Receita por Plano
+  // CHART 3: Bar - Receita por Plano (baseado em pagamentos reais)
   const porPlano = {};
-  clientes.filter(c => c.status === 'Ativo').forEach(c => { const p = c.plano || 'Sem Plano'; porPlano[p] = (porPlano[p] || 0) + parseFloat(c.valor || 0); });
+  pagamentos.filter(p => { const d = new Date(p.data_pagamento + 'T00:00:00'); return d.getMonth() === mes && d.getFullYear() === ano; })
+    .forEach(p => { const pl = p.plano || 'Sem Plano'; porPlano[pl] = (porPlano[pl] || 0) + parseFloat(p.valor || 0); });
   const planoLabels = Object.keys(porPlano); const planoVals = Object.values(porPlano);
   const ctx3 = $('chart-fin-plano').getContext('2d');
   if (chartFinPlano) chartFinPlano.destroy();
@@ -902,11 +955,62 @@ async function loadFinanceiro() {
 
   // Tabela vencidos
   const tbody = $('tbody-fin-vencidos');
-  if (vencidos.length === 0) { tbody.innerHTML = ''; show('fin-vencidos-empty'); return; }
-  hide('fin-vencidos-empty');
-  tbody.innerHTML = vencidos.sort((a, b) => diasAteVencimento(a.vencimento) - diasAteVencimento(b.vencimento)).slice(0, 30).map(c => `<tr><td><strong>${c.nome}</strong></td><td>${c.whatsapp || '—'}</td><td>${c.plano || '—'}</td><td>${fmt(c.valor)}</td><td>${c.vencimento ? new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td><td style="color:#f87171;font-weight:700">${Math.abs(diasAteVencimento(c.vencimento))} dias</td></tr>`).join('');
+  if (vencidos.length === 0) { tbody.innerHTML = ''; show('fin-vencidos-empty'); }
+  else {
+    hide('fin-vencidos-empty');
+    tbody.innerHTML = vencidos.sort((a, b) => diasAteVencimento(a.vencimento) - diasAteVencimento(b.vencimento)).slice(0, 30)
+      .map(c => `<tr><td><strong>${c.nome}</strong></td><td>${c.whatsapp || '—'}</td><td>${c.plano || '—'}</td><td>${fmt(c.valor)}</td><td>${c.vencimento ? new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td><td style="color:#f87171;font-weight:700">${Math.abs(diasAteVencimento(c.vencimento))} dias</td></tr>`).join('');
+  }
+
+  // Histórico de Pagamentos — inicializa com mês atual
+  const mesInput = $('fin-pag-mes');
+  if (mesInput && !mesInput.value) {
+    mesInput.value = `${ano}-${String(mes + 1).padStart(2, '0')}`;
+  }
+  renderPagamentosTabela(pagamentos, mesInput?.value);
 }
+
+function renderPagamentosTabela(pagamentos, filtroMes) {
+  const tbody = $('tbody-pagamentos');
+  if (!tbody) return;
+
+  const listFiltrada = filtroMes
+    ? pagamentos.filter(p => p.data_pagamento?.startsWith(filtroMes))
+    : pagamentos;
+
+  const totalVal = listFiltrada.reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
+  const totalEl = $('fin-pag-total-val');
+  if (totalEl) totalEl.textContent = fmt(totalVal);
+
+  if (listFiltrada.length === 0) { tbody.innerHTML = ''; show('pagamentos-empty'); return; }
+  hide('pagamentos-empty');
+
+  const tipoBadge = {
+    renovacao: '<span style="background:rgba(124,58,237,.2);color:#A78BFA;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;">Renovação</span>',
+    novo: '<span style="background:rgba(16,185,129,.15);color:#34d399;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;">Novo</span>',
+    manual: '<span style="background:rgba(245,158,11,.15);color:#fbbf24;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;">Manual</span>'
+  };
+
+  tbody.innerHTML = listFiltrada.map(p => `
+    <tr>
+      <td>${p.data_pagamento ? new Date(p.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+      <td><strong>${p.cliente_nome || '—'}</strong></td>
+      <td>${p.plano || '—'}</td>
+      <td>${tipoBadge[p.tipo] || tipoBadge.manual}</td>
+      <td style="color:#34d399;font-weight:700">${fmt(p.valor)}</td>
+      <td style="color:var(--text-muted);font-size:.82rem;max-width:180px;overflow:hidden;text-overflow:ellipsis">${p.observacao || '—'}</td>
+    </tr>`).join('');
+}
+
 $('fin-period')?.addEventListener('change', loadFinanceiro);
+
+// Filtro de mês do histórico de pagamentos (sem recarregar tudo)
+document.addEventListener('change', async e => {
+  if (e.target && e.target.id === 'fin-pag-mes') {
+    const { data } = await db.from('pagamentos').select('*').order('data_pagamento', { ascending: false });
+    renderPagamentosTabela(data || [], e.target.value);
+  }
+});
 
 // === CAPTAÇÃO ===
 const CAP_CORES = ['#7C3AED', '#A78BFA', '#10B981', '#F59E0B', '#EF4444', '#60A5FA'];

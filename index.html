@@ -255,7 +255,28 @@
           <div id="fin-vencidos-empty" class="empty-state hidden"><span>✅</span><p>Nenhum cliente vencido.</p></div>
         </div>
       </div>
+
+      <!-- HISTÓRICO DE PAGAMENTOS -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header">
+          <h3>💳 Histórico de Pagamentos</h3>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <input type="month" id="fin-pag-mes" class="filter-select" style="font-size:.85rem;padding:6px 12px;">
+            <div style="font-size:.8rem;color:var(--text-muted);">Total: <strong style="color:#34d399;" id="fin-pag-total-val">R$ 0,00</strong></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Data</th><th>Cliente</th><th>Plano</th><th>Tipo</th><th>Valor</th><th>Obs.</th></tr></thead>
+            <tbody id="tbody-pagamentos"></tbody>
+          </table>
+          <div id="pagamentos-empty" class="empty-state hidden">
+            <span>💳</span><p>Nenhum pagamento registrado neste mês.</p>
+          </div>
+        </div>
+      </div>
     </div>
+
 
     <!-- CAPTAÇÃO -->
     <div id="page-captacao" class="page">
