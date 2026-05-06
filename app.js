@@ -266,7 +266,6 @@ $('setup-form').addEventListener('submit', async e => {
 // === LOGIN ===
 $('login-form').addEventListener('submit', async e => {
   e.preventDefault();
-  alert('Botão Entrar clicado! Tentando conexão...');
   try {
     const email = $('login-email').value.trim();
     const senha = $('login-senha').value;
@@ -274,7 +273,7 @@ $('login-form').addEventListener('submit', async e => {
     hide('login-error');
 
     if (!db) {
-      alert('Banco de dados não disponível. Recarregue a página.');
+      toast('Banco de dados não disponível. Recarregue a página.', 'error');
       return;
     }
 
@@ -288,6 +287,50 @@ $('login-form').addEventListener('submit', async e => {
       email: email,
       password: senha
     });
+
+    if (authErr) {
+      toast('Erro de Autenticação: ' + authErr.message, 'error');
+      btn.textContent = originalText;
+      btn.disabled = false;
+      err.textContent = 'E-mail ou senha incorretos.';
+      show('login-error');
+      return;
+    }
+
+    if (!authData.user) {
+      toast('Login bem sucedido mas usuário não retornado.', 'error');
+      btn.textContent = originalText;
+      btn.disabled = false;
+      return;
+    }
+
+    // Busca dados adicionais do usuário
+    const { data: customUser, error: dbErr } = await db.from('usuarios').select('*').eq('auth_id', authData.user.id).single();
+
+    if (dbErr || !customUser) {
+      toast('Usuário não encontrado na base de dados.', 'error');
+      btn.textContent = originalText;
+      btn.disabled = false;
+      err.textContent = 'Usuário não encontrado.';
+      show('login-error');
+      return;
+    }
+
+    const user = { ...authData.user, ...customUser };
+    if (user.two_factor_enabled) {
+      tempLoginUser = user;
+      hide('login-screen');
+      show('twofa-screen');
+      $('twofa-code').value = '';
+      $('twofa-code').focus();
+    } else {
+      finishLogin(user);
+    }
+  } catch (error) {
+    toast('Erro fatal no login: ' + error.message, 'error');
+    console.error('Login error:', error);
+  }
+});
 
     if (authErr) {
       alert('Erro de Autenticação: ' + authErr.message);
