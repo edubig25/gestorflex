@@ -127,7 +127,11 @@ async function boot() {
     console.error('Boot error:', err);
     hide('splash');
     show('login-screen');
-    toast('Erro ao iniciar. Verifique sua conexão.', 'error');
+    const loginErr = $('login-error');
+    if (loginErr) {
+      loginErr.textContent = 'Erro ao conectar ao banco de dados. Verifique sua conexão com a internet ou se o Supabase está acessível. (' + err.message + ')';
+      show('login-error');
+    }
   }
 }
 
@@ -275,10 +279,10 @@ $('setup-form').addEventListener('submit', async e => {
 // === LOGIN ===
 $('login-form').addEventListener('submit', async e => {
   e.preventDefault();
+  const err = $('login-error');
   try {
     const email = $('login-email').value.trim();
     const senha = $('login-senha').value;
-    const err = $('login-error');
     hide('login-error');
 
     if (!db) {
@@ -336,7 +340,10 @@ $('login-form').addEventListener('submit', async e => {
       finishLogin(user);
     }
   } catch (error) {
-    toast('Erro fatal no login: ' + error.message, 'error');
+    const btn = e.target.querySelector('button[type="submit"]');
+    err.textContent = 'Erro fatal: ' + error.message;
+    show('login-error');
+    if (btn) { btn.textContent = 'Entrar'; btn.disabled = false; }
     console.error('Login error:', error);
   }
 });
