@@ -2678,90 +2678,7 @@ async function fetchJogosAPI(dia) {
   return getJogosSimulados(dia);
 }
 
-function parseFutebolNaTV(html, dia) {
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const jogos = [];
 
-    // Procura por elementos que contenham informações de jogos
-    const allElements = doc.querySelectorAll('*');
-    
-    allElements.forEach(el => {
-      const text = el.textContent || '';
-      
-      // Procura por padrões de horário (ex: 16:00, 19:00)
-      const timeMatch = text.match(/(\d{2}:\d{2})/);
-      if (!timeMatch) return;
-
-      // Verifica se parece ser um jogo (tem "x" entre times ou "vs")
-      if (text.includes(' x ') || text.includes(' vs ') || text.includes('×')) {
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        
-        // Tenta extrair campeonato e times
-        const time = timeMatch[1];
-        let competition = 'Campeonato';
-        let homeTeam = '';
-        let awayTeam = '';
-        let channel = 'TV Aberta';
-
-        // Procura o campeonato (geralmente linha acima ou abaixo do horário)
-        for (const line of lines) {
-          if (line.length > 10 && line.length < 100 && !line.includes(':')) {
-            competition = line;
-            break;
-          }
-        }
-
-        // Procura os times
-        const teamLine = lines.find(l => l.includes(' x ') || l.includes(' vs ') || l.includes('×'));
-        if (teamLine) {
-          const parts = teamLine.split(/ x | vs | × /i);
-          if (parts.length >= 2) {
-            homeTeam = parts[0].trim();
-            awayTeam = parts[1].trim();
-          }
-        }
-
-        // Procura canal
-        const channelMatch = text.match(/(ESPN|PREMIERE|BAND|YOUTUBE|PARAMOUNT|SPORTYNET|DISNEY|STAR\+|GLOBO)/i);
-        if (channelMatch) {
-          channel = channelMatch[0].toUpperCase();
-        }
-
-        if (homeTeam && awayTeam && homeTeam !== awayTeam) {
-          jogos.push({
-            time: time,
-            competition: competition,
-            homeTeam: homeTeam,
-            awayTeam: awayTeam,
-            channel: channel,
-            isDestaque: competition.toLowerCase().includes('libertadores') || 
-                       competition.toLowerCase().includes('brasileiro') ||
-                       competition.toLowerCase().includes('copa')
-          });
-        }
-      }
-    });
-
-    // Remove duplicatas
-    const unique = [];
-    const seen = new Set();
-    jogos.forEach(j => {
-      const key = `${j.time}-${j.homeTeam}-${j.awayTeam}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(j);
-      }
-    });
-
-    console.log('[Jogos] Parse completo:', unique.length, 'jogos encontrados');
-    return unique.length > 0 ? unique : getJogosSimulados(dia);
-  } catch (e) {
-    console.error('[Jogos] Erro no parse:', e.message);
-    return getJogosSimulados(dia);
-  }
-}
 
 function parseFootballData(matches, dia) {
 return matches.map(match => {
@@ -2878,9 +2795,9 @@ function renderJogos(jogos, dia) {
       <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
         Última atualização: <b>${dataAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>
       </div>
-      <p style="font-size: 0.75rem; color: var(--text-muted);">
-        Dados capturados de <a href="https://www.futebolnatv.com.br" target="_blank" style="color: var(--purple-light); text-decoration: underline;">Futebol na TV</a>
-      </p>
+<p style="font-size: 0.75rem; color: var(--text-muted);">
+          Dados capturados via API TheSportsDB
+        </p>
     </div>
   `;
 
