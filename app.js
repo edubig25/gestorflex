@@ -330,6 +330,9 @@ $('login-form').addEventListener('submit', async e => {
     }
 
     const user = { ...authData.user, ...customUser };
+    btn.textContent = originalText;
+    btn.disabled = false;
+    
     if (user.two_factor_enabled) {
       tempLoginUser = user;
       hide('login-screen');
@@ -341,7 +344,7 @@ $('login-form').addEventListener('submit', async e => {
     }
   } catch (error) {
     const btn = e.target.querySelector('button[type="submit"]');
-    err.textContent = 'Erro fatal: ' + error.message;
+    if (err) err.textContent = 'Erro fatal: ' + error.message;
     show('login-error');
     if (btn) { btn.textContent = 'Entrar'; btn.disabled = false; }
     console.error('Login error:', error);
@@ -1913,23 +1916,23 @@ async function fetchMetaCampaigns() {
     const toggleAction = c.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
     const toggleLabel = c.status === 'ACTIVE' ? 'Pausar' : 'Ativar';
     
-    return \`<tr>
-      <td><span class="badge \${bClass}">\${bTxt}</span></td>
-      <td><strong>\${c.name}</strong></td>
-      <td>\${c.objective || '—'}</td>
-      <td style="cursor:pointer; color:var(--purple-light); text-decoration:underline;" onclick="metaUpdateBudget('\${c.id}', '\${c.name}', \${c.daily_budget || 0})">\${budget} ✏️</td>
-      <td>\${fmt(spend)}</td>
-      <td>\${results} (aprox)</td>
+    return `<tr>
+      <td><span class="badge ${bClass}">${bTxt}</span></td>
+      <td><strong>${c.name}</strong></td>
+      <td>${c.objective || '—'}</td>
+      <td style="cursor:pointer; color:var(--purple-light); text-decoration:underline;" onclick="metaUpdateBudget('${c.id}', '${c.name}', ${c.daily_budget || 0})">${budget} ✏️</td>
+      <td>${fmt(spend)}</td>
+      <td>${results} (aprox)</td>
       <td>
-        <button class="action-btn action-edit" onclick="metaToggleStatus('\${c.id}', '\${toggleAction}')">\${toggleLabel}</button>
+        <button class="action-btn action-edit" onclick="metaToggleStatus('${c.id}', '${toggleAction}')">${toggleLabel}</button>
       </td>
-    </tr>\`;
+    </tr>`;
   }).join('');
 }
 
 window.metaToggleStatus = async (campaignId, status) => {
   $('toast').textContent = 'Alterando status...'; show('toast');
-  const res = await apiMeta(\`/\${campaignId}\`, 'POST', { status });
+  const res = await apiMeta(`/${campaignId}`, 'POST', { status });
   if (res) {
     toast('Status atualizado!', 'success');
     fetchMetaCampaigns();
@@ -1939,13 +1942,13 @@ window.metaToggleStatus = async (campaignId, status) => {
 window.metaUpdateBudget = async (campaignId, name, currentBudget) => {
   if (!currentBudget) return toast('Campanhas com orçamento vitalício devem ser alteradas no Meta.', 'info');
   const currentFmt = (currentBudget / 100).toFixed(2);
-  const novo = prompt(\`Novo orçamento diário para "\${name}" (em R$):\`, currentFmt);
+  const novo = prompt(`Novo orçamento diário para "${name}" (em R$):`, currentFmt);
   if (!novo) return;
   const num = parseFloat(novo.replace(',','.'));
   if (isNaN(num) || num <= 0) return toast('Valor inválido', 'error');
   
   const budgetCents = Math.round(num * 100);
-  const res = await apiMeta(\`/\${campaignId}\`, 'POST', { daily_budget: budgetCents });
+  const res = await apiMeta(`/${campaignId}`, 'POST', { daily_budget: budgetCents });
   if (res) {
     toast('Orçamento atualizado!', 'success');
     fetchMetaCampaigns();
