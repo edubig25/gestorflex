@@ -2729,50 +2729,6 @@ function parseFutebolNaTV(html, dia) {
   }
 }
 
-      const data = await response.json();
-      if (!data.events || data.events.length === 0) {
-        console.log('[Jogos] Nenhum evento retornado, tentando próximo proxy');
-        continue;
-      }
-
-      // Converter para o formato usado pela aplicação
-      const jogos = data.events.map(ev => {
-        const time = ev.strTime || '00:00';
-        const competition = ev.strLeague || 'Campeonato';
-        const channel = ev.strTVStation || 'TV Aberta';
-        let homeTeam = '';
-        let awayTeam = '';
-        const sep = ev.strEvent?.includes(' x ') ? ' x ' : ev.strEvent?.includes(' vs ') ? ' vs ' : ' - ';
-        if (ev.strEvent && sep) {
-          const parts = ev.strEvent.split(sep);
-          homeTeam = parts[0]?.trim() || '';
-          awayTeam = parts[1]?.trim() || '';
-        }
-        return {
-          time,
-          competition,
-          homeTeam,
-          awayTeam,
-          channel,
-          isDestaque: /Liga|Campeonato/i.test(competition)
-        };
-      }).filter(j => j.homeTeam && j.awayTeam);
-
-      if (jogos.length > 0) {
-        console.log('[Jogos] Dados reais obtidos via proxy:', jogos.length, 'jogos');
-        return jogos;
-      }
-    } catch (err) {
-      console.log('[Jogos] Falha ao obter dados via proxy:', err.message);
-      continue;
-    }
-  }
-
-  // Fallback para dados simulados se tudo falhar
-  console.log('[Jogos] Usando dados simulados (todos proxies falharam)');
-  return getJogosSimulados(dia);
-}
-
 
 
 function parseFootballData(matches, dia) {
