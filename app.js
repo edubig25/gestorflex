@@ -2550,8 +2550,8 @@ console.log('[Jogos] Dados iniciais carregados:', {
   amanha: jogosData.amanha.length
 });
 
-// Carrega jogos quando navega para página
-if (page === 'jogos') {
+// Carrega jogos ao navegar para página (guardado contra variável indefinida)
+if (typeof page !== 'undefined' && page === 'jogos') {
   console.log('[Jogos] Iniciando página de jogos');
   loadJogosDoDia('hoje');
 }
