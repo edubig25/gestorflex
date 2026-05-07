@@ -533,8 +533,240 @@ select.cobrei-input option {
   .caixa-hero-value { font-size: 2.2rem; }
 }
 @media(max-width:600px) {
-  .caixa-hero-card { padding: 20px 18px 18px; }
-  .caixa-hero-value { font-size: 1.9rem; }
-  .caixa-hero-right { flex-direction: column; }
-  .caixa-pill { min-width: unset; }
+.caixa-hero-card { padding: 20px 18px 18px; }
+.caixa-hero-value { font-size: 1.9rem; }
+.caixa-hero-right { flex-direction: column; }
+.caixa-pill { min-width: unset; }
+}
+
+/* === JOGOS DO DIA === */
+.jogos-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.jogos-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  background: var(--card2);
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.jogo-tab {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.jogo-tab:hover {
+  background: var(--card);
+  color: var(--text);
+}
+
+.jogo-tab.active {
+  background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+  color: #fff;
+  box-shadow: 0 4px 16px var(--purple-glow);
+}
+
+.jogos-conteudo {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  min-height: 300px;
+}
+
+.jogos-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.jogos-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(124, 58, 237, 0.2);
+  border-top-color: var(--purple-light);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.jogos-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.jogos-data {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--purple-light);
+  text-transform: capitalize;
+}
+
+.jogos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.jogo-item {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.jogo-item:hover {
+  border-color: var(--purple-light);
+  transform: translateX(4px);
+}
+
+.jogo-destaque {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(109, 40, 217, 0.1));
+  border: 1px solid var(--purple);
+}
+
+.jogo-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.jogo-horario {
+  background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  min-width: 80px;
+  text-align: center;
+}
+
+.jogo-campeonato {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.jogo-destaque .jogo-campeonato {
+  color: var(--purple-light);
+  font-weight: 600;
+}
+
+.jogo-partida {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.jogo-times {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.jogo-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.jogo-time-bandeira {
+  font-size: 1.2rem;
+}
+
+.jogo-time.destaque {
+  color: var(--purple-light);
+  font-size: 1.1rem;
+}
+
+.jogo-canal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.jogo-canal span {
+  background: var(--card);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.jogo-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.jogo-refresh {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.jogo-refresh button {
+  background: var(--card2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.jogo-refresh button:hover {
+  background: var(--purple);
+  color: #fff;
+  border-color: var(--purple);
+}
+
+@media (max-width: 768px) {
+  .jogo-partida {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .jogo-canal {
+    flex-wrap: wrap;
+  }
+  
+  .jogos-conteudo {
+    padding: 16px;
+  }
 }

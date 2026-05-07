@@ -106,8 +106,9 @@
       <a href="#" class="nav-item" data-page="planos"><span class="nav-icon">🏷️</span><span class="nav-label">Planos</span></a>
       <a href="#" class="nav-item" data-page="whatsapp"><span class="nav-icon" style="color: #25D366;">💬</span><span class="nav-label">WhatsApp</span></a>
       <a href="#" class="nav-item" data-page="configuracoes"><span class="nav-icon">⚙️</span><span class="nav-label">Configurações</span></a>
-      <a href="#" class="nav-item" data-page="meta-ads"><span class="nav-icon" style="color: #0668E1;">🎯</span><span class="nav-label">Meta Ads</span></a>
-    </nav>
+<a href="#" class="nav-item" data-page="meta-ads"><span class="nav-icon" style="color: #0668E1;">🎯</span><span class="nav-label">Meta Ads</span></a>
+<a href="#" class="nav-item" data-page="jogos"><span class="nav-icon" style="color: #F59E0B;">⚽</span><span class="nav-label">Jogos do Dia</span></a>
+</nav>
     <div class="sidebar-footer">
       <div class="user-avatar-wrap">
         <div class="user-avatar" id="sidebar-avatar">U</div>
@@ -888,11 +889,37 @@
       </div>
     </div>
 
-  </div>
-  </div>
+</div>
+</div>
 </div>
 
-  </main>
+<!-- JOGOS DO DIA -->
+<div id="page-jogos" class="page">
+<div class="page-header">
+<div>
+<h1>⚽ Jogos do Dia</h1>
+<p>Confira os jogos de futebol de ontem, hoje e amanhã • Dados atualizados do <a href="https://www.futebolnatv.com.br" target="_blank" style="color: var(--purple-light); text-decoration: underline;">Futebol na TV</a></p>
+</div>
+<button class="btn-primary" id="btn-atualizar-jogos" style="margin-left: auto;">🔄 Atualizar</button>
+</div>
+
+<div class="jogos-container">
+<div class="jogos-tabs">
+<button class="jogo-tab active" data-dia="ontem">Ontem</button>
+<button class="jogo-tab" data-dia="hoje">Hoje</button>
+<button class="jogo-tab" data-dia="amanha">Amanhã</button>
+</div>
+
+<div id="jogos-conteudo" class="jogos-conteudo">
+<div class="jogos-loading">
+<div class="spinner"></div>
+<p>Carregando jogos...</p>
+</div>
+</div>
+</div>
+</div>
+
+</main>
 </div>
 
 <!-- MODAL CLIENTE -->
