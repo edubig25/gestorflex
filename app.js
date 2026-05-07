@@ -553,7 +553,10 @@ if (page === 'planos') loadPlanosPage();
 if (page === 'whatsapp') loadWhatsApp();
 if (page === 'configuracoes') populateConfig();
 if (page === 'meta-ads') loadMetaAds();
-if (page === 'jogos') loadJogosDoDia('hoje');
+if (page === 'jogos') {
+  console.log('[Jogos] Navegando para página de jogos');
+  loadJogosDoDia('hoje');
+}
 }
 
 $('menu-toggle').addEventListener('click', () => $('sidebar').classList.toggle('open'));
@@ -1385,6 +1388,8 @@ window.renovar = renovar;
 window.confirmDeleteCliente = confirmDeleteCliente;
 window.confirmDeletePlano = confirmDeletePlano;
 window.openEditPlano = openEditPlano;
+window.copiarJogos = copiarJogos;
+window.gerarImagemJogos = gerarImagemJogos;
 
 // === WHATSAPP MODULE ===
 const EVO_URL = 'https://evolution-api-production-651d.up.railway.app';
@@ -2506,132 +2511,190 @@ document.querySelectorAll('input[name="wa-schedule"]').forEach(radio => {
 // === JOGOS DO DIA ===
 let jogosData = { ontem: [], hoje: [], amanha: [] };
 let currentDia = 'hoje';
-
-// Adiciona navegação para jogos
-if (page === 'jogos') loadJogosDoDia();
-
 let lastFetchTime = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
+// Adiciona navegação para jogos
+if (page === 'jogos') loadJogosDoDia('hoje');
+
 async function loadJogosDoDia(dia = 'hoje') {
-const conteudo = $('jogos-conteudo');
-if (!conteudo) return;
+  const conteudo = $('jogos-conteudo');
+  if (!conteudo) {
+    console.error('[Jogos] Elemento jogos-conteudo não encontrado');
+    return;
+  }
 
-conteudo.innerHTML = `
-<div class="jogos-loading">
-<div class="spinner"></div>
-<p>Carregando jogos...</p>
-</div>
-`;
+  console.log('[Jogos] Carregando jogos para:', dia);
 
-currentDia = dia;
+  // Mostra loading
+  conteudo.innerHTML = `
+    <div class="jogos-loading">
+      <div class="spinner"></div>
+      <p>Carregando jogos...</p>
+      <p style="font-size: 0.8rem; margin-top: 8px; opacity: 0.7;">Aguarde...</p>
+    </div>
+  `;
 
-// Atualiza abas
-document.querySelectorAll('.jogo-tab').forEach(tab => {
-tab.classList.toggle('active', tab.dataset.dia === dia);
-});
+  currentDia = dia;
 
-try {
-// Busca dados atualizados do site Futebol na TV
-const agora = Date.now();
-let jogos;
+  // Atualiza abas
+  document.querySelectorAll('.jogo-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.dia === dia);
+  });
 
-// Usa cache se tiver menos de 5 minutos
-if (jogosData[dia] && (agora - lastFetchTime) < CACHE_DURATION) {
-jogos = jogosData[dia];
-} else {
-jogos = await fetchJogosAPI(dia);
-jogosData[dia] = jogos;
-lastFetchTime = agora;
-}
+  try {
+    let jogos;
 
-renderJogos(jogos, dia);
-} catch (err) {
-console.error('Erro ao buscar jogos:', err);
-conteudo.innerHTML = `
-<div class="jogo-empty">
-<p>⚠️ Erro ao carregar os jogos. Tente novamente.</p>
-<div class="jogo-refresh">
-<button onclick="loadJogosDoDia('${dia}')">🔄 Tentar Novamente</button>
-</div>
-</div>
-`;
-}
+    // Sempre busca dados novos da API (cache removido para garantir atualização)
+    console.log('[Jogos] Buscando dados atualizados para:', dia);
+    jogos = await fetchJogosAPI(dia);
+    
+    // Armazena em cache
+    jogosData[dia] = jogos;
+    lastFetchTime = Date.now();
+    
+    console.log('[Jogos] Dados recebidos:', jogos.length, 'jogos');
+    
+    // Renderiza
+    renderJogos(jogos, dia);
+  } catch (err) {
+    console.error('[Jogos] Erro ao buscar jogos:', err);
+    // Em caso de erro, usa dados simulados
+    const fallbackJogos = getJogosSimulados(dia);
+    jogosData[dia] = fallbackJogos;
+    renderJogos(fallbackJogos, dia);
+  }
 }
 
 async function fetchJogosAPI(dia) {
-// Tenta buscar via proxy CORS para contornar restrições
-const corsProxies = [
-'https://api.allorigins.win/raw?url=',
-'https://corsproxy.io/?'
-];
+  console.log('[Jogos] Buscando dados da API para:', dia);
+  
+  const timeout = 15000; // 15 segundos de timeout
+  
+  try {
+    // Tenta buscar via proxy CORS para contornar restrições
+    const corsProxies = [
+      'https://api.allorigins.win/raw?url=',
+      'https://corsproxy.io/?'
+    ];
 
-for (const proxy of corsProxies) {
-try {
-const url = proxy + encodeURIComponent('https://www.futebolnatv.com.br');
-const response = await fetch(url);
+    for (const proxy of corsProxies) {
+      try {
+        const url = proxy + encodeURIComponent('https://www.futebolnatv.com.br');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        const response = await fetch(url, { 
+          signal: controller.signal,
+          headers: { 'Accept': 'text/html' }
+        });
+        clearTimeout(timeoutId);
 
-if (response.ok) {
-const html = await response.text();
-const jogos = parseFutebolNaTV(html, dia);
-if (jogos.length > 0) {
-return jogos;
-}
-}
-} catch (err) {
-console.log('Proxy falhou, tentando próximo:', err);
-continue;
-}
-}
+        if (response.ok) {
+          const html = await response.text();
+          const jogos = parseFutebolNaTV(html, dia);
+          if (jogos && jogos.length > 0) {
+            console.log('[Jogos] Dados obtidos via proxy:', jogos.length, 'jogos');
+            return jogos;
+          }
+        }
+      } catch (err) {
+        console.log('[Jogos] Proxy falhou, tentando próximo:', err.message);
+        continue;
+      }
+    }
+  } catch (err) {
+    console.error('[Jogos] Erro na fetch:', err.message);
+  }
 
-// Se todos os proxies falharem, usa dados simulados
-console.log('Usando dados simulados (todos proxies falharam)');
-return getJogosSimulados(dia);
+  // Se todos os proxies falharem, usa dados simulados
+  console.log('[Jogos] Usando dados simulados (todos proxies falharam)');
+  return getJogosSimulados(dia);
 }
 
 function parseFutebolNaTV(html, dia) {
-const parser = new DOMParser();
-const doc = parser.parseFromString(html, 'text/html');
-const jogos = [];
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const jogos = [];
 
-// Procura por seções de jogos por horário
-const sections = doc.querySelectorAll('section, div[class*="jogo"], div[class*="match"], div[class*="game"]');
+    // Procura por elementos que contenham informações de jogos
+    const allElements = doc.querySelectorAll('*');
+    
+    allElements.forEach(el => {
+      const text = el.textContent || '';
+      
+      // Procura por padrões de horário (ex: 16:00, 19:00)
+      const timeMatch = text.match(/(\d{2}:\d{2})/);
+      if (!timeMatch) return;
 
-sections.forEach(section => {
-try {
-// Tenta extrair informações do jogo
-const timeMatch = section.textContent?.match(/(\d{2}:\d{2})/);
-const time = timeMatch ? timeMatch[1] : '';
+      // Verifica se parece ser um jogo (tem "x" entre times ou "vs")
+      if (text.includes(' x ') || text.includes(' vs ') || text.includes('×')) {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
+        // Tenta extrair campeonato e times
+        const time = timeMatch[1];
+        let competition = 'Campeonato';
+        let homeTeam = '';
+        let awayTeam = '';
+        let channel = 'TV Aberta';
 
-// Verifica se é um jogo válido
-const hasTeams = section.textContent?.includes('x') || section.textContent?.includes('vs');
-const hasCompetition = section.textContent?.length > 20;
+        // Procura o campeonato (geralmente linha acima ou abaixo do horário)
+        for (const line of lines) {
+          if (line.length > 10 && line.length < 100 && !line.includes(':')) {
+            competition = line;
+            break;
+          }
+        }
 
-if (time && hasTeams && hasCompetition) {
-const lines = section.textContent?.split('\n').map(l => l.trim()).filter(l => l) || [];
-const competition = lines.find(l => l.length > 10 && !l.includes(':')) || 'Campeonato';
-const teams = lines.filter(l => l.includes('x') || l.includes('vs') || (l.includes(' ') && l.length < 50));
-const homeTeam = teams[0]?.split(/[x|vs]/i)[0]?.trim() || '';
-const awayTeam = teams[0]?.split(/[x|vs]/i)[1]?.trim() || '';
-const channels = lines.filter(l => l.includes('YOUTUBE') || l.includes('ESPN') || l.includes('PREMIERE') || l.includes('BAND')).join(' | ');
+        // Procura os times
+        const teamLine = lines.find(l => l.includes(' x ') || l.includes(' vs ') || l.includes('×'));
+        if (teamLine) {
+          const parts = teamLine.split(/ x | vs | × /i);
+          if (parts.length >= 2) {
+            homeTeam = parts[0].trim();
+            awayTeam = parts[1].trim();
+          }
+        }
 
-if (homeTeam && awayTeam) {
-jogos.push({
-time: time,
-competition: competition,
-homeTeam: homeTeam,
-awayTeam: awayTeam,
-channel: channels || 'TV Aberta',
-isDestaque: competition.toLowerCase().includes('libertadores') || competition.toLowerCase().includes('brasileiro')
-});
-}
-}
-} catch (e) {
-console.error('Erro ao parsear jogo:', e);
-}
-});
+        // Procura canal
+        const channelMatch = text.match(/(ESPN|PREMIERE|BAND|YOUTUBE|PARAMOUNT|SPORTYNET|DISNEY|STAR\+|GLOBO)/i);
+        if (channelMatch) {
+          channel = channelMatch[0].toUpperCase();
+        }
 
-return jogos.length > 0 ? jogos : getJogosSimulados(dia);
+        if (homeTeam && awayTeam && homeTeam !== awayTeam) {
+          jogos.push({
+            time: time,
+            competition: competition,
+            homeTeam: homeTeam,
+            awayTeam: awayTeam,
+            channel: channel,
+            isDestaque: competition.toLowerCase().includes('libertadores') || 
+                       competition.toLowerCase().includes('brasileiro') ||
+                       competition.toLowerCase().includes('copa')
+          });
+        }
+      }
+    });
+
+    // Remove duplicatas
+    const unique = [];
+    const seen = new Set();
+    jogos.forEach(j => {
+      const key = `${j.time}-${j.homeTeam}-${j.awayTeam}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(j);
+      }
+    });
+
+    console.log('[Jogos] Parse completo:', unique.length, 'jogos encontrados');
+    return unique.length > 0 ? unique : getJogosSimulados(dia);
+  } catch (e) {
+    console.error('[Jogos] Erro no parse:', e.message);
+    return getJogosSimulados(dia);
+  }
 }
 
 function parseFootballData(matches, dia) {
@@ -2660,312 +2723,461 @@ isDestaque: false
 }
 
 function getJogosSimulados(dia) {
-// Dados reais baseados no site futebolnatv.com.br (atualizados)
-const jogosReais = {
-'ontem': [
-{
-time: '10:00',
-competition: '🇧🇷 Campeonato Paulista A2 - Final',
-homeTeam: 'Juventus SP',
-awayTeam: 'Ferroviária',
-channel: 'XSPORTS | YOUTUBE',
-isDestaque: true
-},
-{
-time: '19:00',
-competition: '🇧🇷 Copa do Nordeste',
-homeTeam: 'Confiança',
-awayTeam: 'Fortaleza',
-channel: 'SPORTYNET',
-isDestaque: true
-},
-{
-time: '21:00',
-competition: '🇧🇷 Copa Libertadores',
-homeTeam: 'Coquimbo Unido',
-awayTeam: 'Universitario',
-channel: 'PARAMOUNT+',
-isDestaque: true
-}
-],
-'hoje': [
-{
-time: '15:00',
-competition: '🇸🇦 Campeonato Saudita',
-homeTeam: 'Al Shabab',
-awayTeam: 'Al-Nassr',
-channel: 'BANDSPORTS | CANAL GOAT',
-isDestaque: false
-},
-{
-time: '16:00',
-competition: '🇪� UEFA Europa League - Semifinal',
-homeTeam: 'Aston Villa',
-awayTeam: 'Nottingham Forest',
-channel: 'YOUTUBE (CAZÉTV)',
-isDestaque: true
-},
-{
-time: '16:00',
-competition: '🇪� UEFA Europa League - Semifinal',
-homeTeam: 'SC Freiburg',
-awayTeam: 'SC Braga',
-channel: 'YOUTUBE (CAZÉTV)',
-isDestaque: true
-},
-{
-time: '16:00',
-competition: '🇪� UEFA Conference League - Semifinal',
-homeTeam: 'Crystal Palace',
-awayTeam: 'Shakhtar Donetsk',
-channel: 'YOUTUBE (CAZÉTV)',
-isDestaque: true
-},
-{
-time: '16:00',
-competition: '🇪� UEFA Conference League - Semifinal',
-homeTeam: 'Strasbourg',
-awayTeam: 'Rayo Vallecano',
-channel: 'YOUTUBE (CAZÉTV)',
-isDestaque: true
-},
-{
-time: '19:00',
-competition: '🇦🇷🇺🇾 Copa Libertadores ⭐',
-homeTeam: 'Platense',
-awayTeam: 'Peñarol',
-channel: 'PARAMOUNT+',
-isDestaque: true
-},
-{
-time: '19:00',
-competition: '🇧🇷🇪🇨 Copa Libertadores ⭐',
-homeTeam: 'MIRASSOL',
-awayTeam: 'LDU de QUITO',
-channel: 'PARAMOUNT+',
-isDestaque: true
-},
-{
-time: '19:00',
-competition: '🇨🇱🇧🇷 Copa Sul-Americana ⭐',
-homeTeam: 'O\'HIGGINS',
-awayTeam: 'SÃO PAULO',
-channel: 'ESPN | DISNEY+',
-isDestaque: true
-},
-{
-time: '19:00',
-competition: '🇺🇾🇨🇴 Copa Sul-Americana',
-homeTeam: 'Boston River',
-awayTeam: 'Millonarios',
-channel: 'PARAMOUNT+',
-isDestaque: false
-},
-{
-time: '19:30',
-competition: '🇧🇷 Copa do Nordeste - Quartas',
-homeTeam: 'Confiança',
-awayTeam: 'Fortaleza',
-channel: 'SPORTYNET',
-isDestaque: true
-},
-{
-time: '21:00',
-competition: '🇨🇱🇵🇪 Copa Libertadores',
-homeTeam: 'Coquimbo Unido',
-awayTeam: 'Universitario',
-channel: 'PARAMOUNT+',
-isDestaque: false
-},
-{
-time: '21:30',
-competition: '🇨🇴🇧🇷 Copa Libertadores ⭐',
-homeTeam: 'INDEPENDIENTE MEDELLÍN',
-awayTeam: 'FLAMENGO',
-channel: 'ESPN | DISNEY+',
-isDestaque: true
-},
-{
-time: '21:30',
-competition: '🇻🇪🇦🇷 Copa Sul-Americana',
-homeTeam: 'Carabobo FC',
-awayTeam: 'River Plate',
-channel: 'PARAMOUNT+',
-isDestaque: true
-},
-{
-time: '21:30',
-competition: '🇧🇴🇧🇷 Copa Sul-Americana ⭐',
-homeTeam: 'BLOOMING',
-awayTeam: 'RB BRAGANTINO',
-channel: 'ESPN 4 | DISNEY+',
-isDestaque: true
-},
-{
-time: '23:00',
-competition: '🇨🇴🇵🇾 Copa Libertadores',
-homeTeam: 'Junior',
-awayTeam: 'Cerro Porteño',
-channel: 'ESPN 2 | ESPN 3 | DISNEY+',
-isDestaque: false
-}
-],
-'amanha': [
-{
-time: '16:00',
-competition: '🇧🇷 Campeonato Brasileiro',
-homeTeam: 'Santos',
-awayTeam: 'Corinthians',
-channel: 'PREMIERE',
-isDestaque: true
-},
-{
-time: '19:00',
-competition: '🇧🇷 Copa do Brasil',
-homeTeam: 'Grêmio',
-awayTeam: 'Fluminense',
-channel: 'GLOBO | PREMIERE',
-isDestaque: true
-},
-{
-time: '20:00',
-competition: '🇧🇷 Copa do Brasil',
-homeTeam: 'São Paulo',
-awayTeam: 'Corinthians',
-channel: 'GLOBO | PREMIERE',
-isDestaque: true
-},
-{
-time: '21:30',
-competition: '🇦🇷 Liga Profesional',
-homeTeam: 'Boca Juniors',
-awayTeam: 'River Plate',
-channel: 'ESPN | STAR+',
-isDestaque: true
-},
-{
-time: '16:00',
-competition: '🇬🇧 Premier League',
-homeTeam: 'Manchester City',
-awayTeam: 'Arsenal',
-channel: 'ESPN',
-isDestaque: true
-},
-{
-time: '11:00',
-competition: '🇮🇹 Serie A',
-homeTeam: 'Inter Milan',
-awayTeam: 'Napoli',
-channel: 'ONEFOIGHT',
-isDestaque: false
-}
-]
-};
+  console.log('[Jogos] Usando dados simulados para:', dia);
+  
+  // Dados reais baseados no site futebolnatv.com.br (atualizados)
+  const jogosReais = {
+    'ontem': [
+      {
+        time: '10:00',
+        competition: '🇧🇷 Campeonato Paulista A2 - Final',
+        homeTeam: 'Juventus SP',
+        awayTeam: 'Ferroviária',
+        channel: 'XSPORTS | YOUTUBE',
+        isDestaque: true
+      },
+      {
+        time: '19:00',
+        competition: '🇧🇷 Copa do Nordeste',
+        homeTeam: 'Confiança',
+        awayTeam: 'Fortaleza',
+        channel: 'SPORTYNET',
+        isDestaque: true
+      },
+      {
+        time: '21:00',
+        competition: '🇧🇷 Copa Libertadores',
+        homeTeam: 'Coquimbo Unido',
+        awayTeam: 'Universitario',
+        channel: 'PARAMOUNT+',
+        isDestaque: true
+      }
+    ],
+    'hoje': [
+      {
+        time: '15:00',
+        competition: '🇸🇦 Campeonato Saudita',
+        homeTeam: 'Al Shabab',
+        awayTeam: 'Al-Nassr',
+        channel: 'BANDSPORTS | CANAL GOAT',
+        isDestaque: false
+      },
+      {
+        time: '16:00',
+        competition: '🇪🇺 UEFA Europa League - Semifinal',
+        homeTeam: 'Aston Villa',
+        awayTeam: 'Nottingham Forest',
+        channel: 'YOUTUBE (CAZÉTV)',
+        isDestaque: true
+      },
+      {
+        time: '16:00',
+        competition: '🇪🇺 UEFA Europa League - Semifinal',
+        homeTeam: 'SC Freiburg',
+        awayTeam: 'SC Braga',
+        channel: 'YOUTUBE (CAZÉTV)',
+        isDestaque: true
+      },
+      {
+        time: '16:00',
+        competition: '🇪🇺 UEFA Conference League - Semifinal',
+        homeTeam: 'Crystal Palace',
+        awayTeam: 'Shakhtar Donetsk',
+        channel: 'YOUTUBE (CAZÉTV)',
+        isDestaque: true
+      },
+      {
+        time: '16:00',
+        competition: '🇪🇺 UEFA Conference League - Semifinal',
+        homeTeam: 'Strasbourg',
+        awayTeam: 'Rayo Vallecano',
+        channel: 'YOUTUBE (CAZÉTV)',
+        isDestaque: true
+      },
+      {
+        time: '19:00',
+        competition: '🇦🇷🇺🇾 Copa Libertadores ⭐',
+        homeTeam: 'Platense',
+        awayTeam: 'Peñarol',
+        channel: 'PARAMOUNT+',
+        isDestaque: true
+      },
+      {
+        time: '19:00',
+        competition: '🇧🇷🇪🇨 Copa Libertadores ⭐',
+        homeTeam: 'MIRASSOL',
+        awayTeam: 'LDU de QUITO',
+        channel: 'PARAMOUNT+',
+        isDestaque: true
+      },
+      {
+        time: '19:00',
+        competition: '🇨🇱🇧🇷 Copa Sul-Americana ⭐',
+        homeTeam: 'O\'HIGGINS',
+        awayTeam: 'SÃO PAULO',
+        channel: 'ESPN | DISNEY+',
+        isDestaque: true
+      },
+      {
+        time: '19:00',
+        competition: '🇺🇾🇨🇴 Copa Sul-Americana',
+        homeTeam: 'Boston River',
+        awayTeam: 'Millonarios',
+        channel: 'PARAMOUNT+',
+        isDestaque: false
+      },
+      {
+        time: '19:30',
+        competition: '🇧🇷 Copa do Nordeste - Quartas',
+        homeTeam: 'Confiança',
+        awayTeam: 'Fortaleza',
+        channel: 'SPORTYNET',
+        isDestaque: true
+      },
+      {
+        time: '21:00',
+        competition: '🇨🇱🇵🇪 Copa Libertadores',
+        homeTeam: 'Coquimbo Unido',
+        awayTeam: 'Universitario',
+        channel: 'PARAMOUNT+',
+        isDestaque: false
+      },
+      {
+        time: '21:30',
+        competition: '🇨🇴🇧🇷 Copa Libertadores ⭐',
+        homeTeam: 'INDEPENDIENTE MEDELLÍN',
+        awayTeam: 'FLAMENGO',
+        channel: 'ESPN | DISNEY+',
+        isDestaque: true
+      },
+      {
+        time: '21:30',
+        competition: '🇻🇪🇦🇷 Copa Sul-Americana',
+        homeTeam: 'Carabobo FC',
+        awayTeam: 'River Plate',
+        channel: 'PARAMOUNT+',
+        isDestaque: true
+      },
+      {
+        time: '21:30',
+        competition: '🇧🇴🇧🇷 Copa Sul-Americana ⭐',
+        homeTeam: 'BLOOMING',
+        awayTeam: 'RB BRAGANTINO',
+        channel: 'ESPN 4 | DISNEY+',
+        isDestaque: true
+      },
+      {
+        time: '23:00',
+        competition: '🇨🇴🇵🇾 Copa Libertadores',
+        homeTeam: 'Junior',
+        awayTeam: 'Cerro Porteño',
+        channel: 'ESPN 2 | ESPN 3 | DISNEY+',
+        isDestaque: false
+      }
+    ],
+    'amanha': [
+      {
+        time: '16:00',
+        competition: '🇧🇷 Campeonato Brasileiro',
+        homeTeam: 'Santos',
+        awayTeam: 'Corinthians',
+        channel: 'PREMIERE',
+        isDestaque: true
+      },
+      {
+        time: '19:00',
+        competition: '🇧🇷 Copa do Brasil',
+        homeTeam: 'Grêmio',
+        awayTeam: 'Fluminense',
+        channel: 'GLOBO | PREMIERE',
+        isDestaque: true
+      },
+      {
+        time: '20:00',
+        competition: '🇧🇷 Copa do Brasil',
+        homeTeam: 'São Paulo',
+        awayTeam: 'Corinthians',
+        channel: 'GLOBO | PREMIERE',
+        isDestaque: true
+      },
+      {
+        time: '21:30',
+        competition: '🇦🇷 Liga Profesional',
+        homeTeam: 'Boca Juniors',
+        awayTeam: 'River Plate',
+        channel: 'ESPN | STAR+',
+        isDestaque: true
+      },
+      {
+        time: '16:00',
+        competition: '🇬🇧 Premier League',
+        homeTeam: 'Manchester City',
+        awayTeam: 'Arsenal',
+        channel: 'ESPN',
+        isDestaque: true
+      },
+      {
+        time: '11:00',
+        competition: '🇮🇹 Serie A',
+        homeTeam: 'Inter Milan',
+        awayTeam: 'Napoli',
+        channel: 'ONEFOIGHT',
+        isDestaque: false
+      }
+    ]
+  };
 
-return jogosReais[dia] || [];
+  return jogosReais[dia] || [];
 }
 
 function renderJogos(jogos, dia) {
-const conteudo = $('jogos-conteudo');
-if (!conteudo) return;
+  const conteudo = $('jogos-conteudo');
+  if (!conteudo) {
+    console.error('[Jogos] Elemento jogos-conteudo não encontrado no render');
+    return;
+  }
 
-const hoje = new Date();
-if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
-if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
-const dataFormatada = hoje.toLocaleDateString('pt-BR');
-const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  console.log('[Jogos] Renderizando', jogos?.length || 0, 'jogos para', dia);
 
-if (!jogos || jogos.length === 0) {
-conteudo.innerHTML = `
-<div class="jogo-empty">
-<p>📅 Nenhum jogo de futebol para ${dia === 'ontem' ? 'ontem' : dia === 'hoje' ? 'hoje' : 'amanhã'}.</p>
-<div class="jogo-refresh">
-<button onclick="loadJogosDoDia('${dia}')">🔄 Atualizar</button>
-</div>
-</div>
-`;
-return;
+  const hoje = new Date();
+  if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
+  if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
+  const dataFormatada = hoje.toLocaleDateString('pt-BR');
+  const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  if (!jogos || jogos.length === 0) {
+    conteudo.innerHTML = `
+      <div class="jogo-empty">
+        <p>📅 Nenhum jogo de futebol para ${dia === 'ontem' ? 'ontem' : dia === 'hoje' ? 'hoje' : 'amanhã'}.</p>
+        <div class="jogo-refresh">
+          <button onclick="loadJogosDoDia('${dia}')" style="margin-top: 12px; background: var(--purple); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">🔄 Atualizar</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="jogos-header">
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div>
+          <div class="jogos-data">${dataFormatada}</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+            ${jogos.length} jogo${jogos.length !== 1 ? 's' : ''} encontrado${jogos.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="copiarJogos('${dia}')" style="background: var(--card2); color: var(--purple-light); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;">📋 Copiar</button>
+          <button onclick="gerarImagemJogos('${dia}')" style="background: linear-gradient(135deg, var(--purple), var(--purple-dark)); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 16px var(--purple-glow);">🖼️ Gerar Imagem</button>
+        </div>
+      </div>
+    </div>
+    <div class="jogos-list">
+    `;
+
+  jogos.forEach(jogo => {
+    const destaqueClass = jogo.isDestaque ? 'jogo-destaque' : '';
+    const homeClass = jogo.isDestaque ? 'destaque' : '';
+
+    html += `
+      <div class="jogo-item ${destaqueClass}">
+        <div class="jogo-info">
+          <div class="jogo-horario">🕗 ${jogo.time}</div>
+          <div class="jogo-campeonato">${jogo.competition}</div>
+        </div>
+        <div class="jogo-partida">
+          <div class="jogo-times">
+            <div class="jogo-time ${homeClass}">
+              ${jogo.isDestaque ? '⭐' : ''} ${jogo.homeTeam}
+            </div>
+            <div style="color: var(--text-muted);">x</div>
+            <div class="jogo-time ${homeClass}">
+              ${jogo.awayTeam} ${jogo.isDestaque ? '⭐' : ''}
+            </div>
+          </div>
+          <div class="jogo-canal">
+            <span>📺 ${jogo.channel}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+
+  // Adiciona nota de atualização
+  const dataAtualizacao = new Date();
+  html += `
+    <div class="jogo-refresh" style="margin-top: 20px; text-align: center; font-size: 0.85rem; color: var(--text-muted);">
+      <p>📅 Atualizado em ${dataAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+      <p style="margin-top: 4px;">Fonte: <a href="https://www.futebolnatv.com.br" target="_blank" style="color: var(--purple-light);">Futebol na TV</a></p>
+    </div>
+  `;
+
+  conteudo.innerHTML = html;
 }
 
-let html = `
-<div class="jogos-header">
-<div>
-<div class="jogos-data">${dataFormatada}</div>
-<div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
-${jogos.length} jogo${jogos.length !== 1 ? 's' : ''} encontrado${jogos.length !== 1 ? 's' : ''}
-</div>
-</div>
-</div>
-<div class="jogos-list">
-`;
+// === FUNÇÕES AUXILIARES DOS JOGOS ===
+async function copiarJogos(dia) {
+  const jogos = jogosData[dia] || [];
+  if (jogos.length === 0) {
+    toast('Nenhum jogo para copiar', 'info');
+    return;
+  }
 
-jogos.forEach(jogo => {
-const destaqueClass = jogo.isDestaque ? 'jogo-destaque' : '';
-const homeClass = jogo.isDestaque ? 'destaque' : '';
+  const hoje = new Date();
+  if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
+  if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
+  const dataFormatada = hoje.toLocaleDateString('pt-BR');
 
-html += `
-<div class="jogo-item ${destaqueClass}">
-<div class="jogo-info">
-<div class="jogo-horario">🕗 ${jogo.time}</div>
-<div class="jogo-campeonato">${jogo.competition}</div>
-</div>
-<div class="jogo-partida">
-<div class="jogo-times">
-<div class="jogo-time ${homeClass}">
-${jogo.isDestaque ? '⭐' : ''} ${jogo.homeTeam}
-</div>
-<div style="color: var(--text-muted);">x</div>
-<div class="jogo-time ${homeClass}">
-${jogo.awayTeam} ${jogo.isDestaque ? '⭐' : ''}
-</div>
-</div>
-<div class="jogo-canal">
-<span>📺 ${jogo.channel}</span>
-</div>
-</div>
-</div>
-`;
-});
+  let texto = `⚽ JOGOS DO DIA - ${dataFormatada}\n\n`;
+  jogos.forEach((jogo, index) => {
+    texto += `${index + 1}. ${jogo.time} - ${jogo.competition}\n`;
+    texto += `   ${jogo.homeTeam} x ${jogo.awayTeam}\n`;
+    texto += `   📺 ${jogo.channel}\n\n`;
+  });
 
-html += '</div>';
+  texto += `Fonte: Futebol na TV`;
 
-// Adiciona nota de atualização
-const dataAtualizacao = new Date();
-html += `
-<div class="jogo-refresh" style="margin-top: 20px; text-align: center; font-size: 0.85rem; color: var(--text-muted);">
-<p>📅 Atualizado em ${dataAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-<p style="margin-top: 4px;">Fonte: <a href="https://www.futebolnatv.com.br" target="_blank" style="color: var(--purple-light);">Futebol na TV</a></p>
-</div>
-`;
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast('Jogos copiados com sucesso!', 'success');
+  } catch (err) {
+    console.error('Erro ao copiar:', err);
+    toast('Erro ao copiar. Tente manualmente.', 'error');
+  }
+}
 
-conteudo.innerHTML = html;
+async function gerarImagemJogos(dia) {
+  const jogos = jogosData[dia] || [];
+  if (jogos.length === 0) {
+    toast('Nenhum jogo para gerar imagem', 'info');
+    return;
+  }
+
+  const hoje = new Date();
+  if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
+  if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
+  const dataFormatada = hoje.toLocaleDateString('pt-BR');
+
+  // Cria um canvas para gerar a imagem
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Configurações
+  const padding = 30;
+  const itemHeight = 70;
+  const headerHeight = 80;
+  const width = 800;
+  const height = headerHeight + (jogos.length * itemHeight) + 100;
+  
+  canvas.width = width;
+  canvas.height = height;
+
+  // Fundo gradiente
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, '#0D0A1A');
+  gradient.addColorStop(1, '#1E1838');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  // Título
+  ctx.fillStyle = '#A78BFA';
+  ctx.font = 'bold 28px Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`⚽ JOGOS DO DIA - ${dataFormatada}`, width / 2, 50);
+
+  // Lista de jogos
+  let yPos = headerHeight;
+  jogos.forEach((jogo, index) => {
+    const isDestaque = jogo.isDestaque;
+    
+    // Fundo do item
+    ctx.fillStyle = isDestaque ? 'rgba(124, 58, 237, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+    ctx.fillRect(padding + 10, yPos + 10, width - (padding * 2) - 20, itemHeight - 20);
+
+    // Horário
+    ctx.fillStyle = '#7C3AED';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`🕗 ${jogo.time}`, padding + 20, yPos + 30);
+
+    // Campeonato
+    ctx.fillStyle = '#9B93C5';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText(jogo.competition, padding + 100, yPos + 30);
+
+    // Times
+    ctx.fillStyle = isDestaque ? '#A78BFA' : '#E2E0F0';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText(`${jogo.homeTeam}`, padding + 20, yPos + 55);
+    
+    ctx.fillStyle = '#9B93C5';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText('x', padding + 220, yPos + 55);
+    
+    ctx.fillStyle = isDestaque ? '#A78BFA' : '#E2E0F0';
+    ctx.fillText(`${jogo.awayTeam}`, padding + 240, yPos + 55);
+
+    // Canal
+    ctx.fillStyle = '#34d399';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText(`📺 ${jogo.channel}`, width - padding - 120, yPos + 55);
+
+    yPos += itemHeight;
+  });
+
+  // Rodapé
+  ctx.fillStyle = '#9B93C5';
+  ctx.font = '12px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Fonte: Futebol na TV • Atualizado em ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, width / 2, height - 20);
+
+  // Baixa a imagem
+  try {
+    const link = document.createElement('a');
+    link.download = `jogos-${dia}-${hoje.toISOString().slice(0, 10)}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('Imagem gerada com sucesso!', 'success');
+  } catch (err) {
+    console.error('Erro ao gerar imagem:', err);
+    toast('Erro ao gerar imagem', 'error');
+  }
 }
 
 // Adiciona event listeners para jogos
 document.addEventListener('DOMContentLoaded', () => {
-// Botão atualizar
-const btnAtualizar = $('btn-atualizar-jogos');
-if (btnAtualizar) {
-btnAtualizar.addEventListener('click', () => {
-loadJogosDoDia(currentDia);
-});
-}
+  console.log('[Jogos] DOM carregado, configurando listeners');
+  
+  // Botão atualizar
+  const btnAtualizar = $('btn-atualizar-jogos');
+  if (btnAtualizar) {
+    btnAtualizar.addEventListener('click', () => {
+      console.log('[Jogos] Botão atualizar clicado');
+      lastFetchTime = 0; // Reseta cache
+      loadJogosDoDia(currentDia);
+    });
+  }
 
-// Abas dos dias
-document.querySelectorAll('.jogo-tab').forEach(tab => {
-tab.addEventListener('click', () => {
-const dia = tab.dataset.dia;
-if (dia && dia !== currentDia) {
-loadJogosDoDia(dia);
-}
-});
-});
+  // Abas dos dias
+  document.querySelectorAll('.jogo-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const dia = tab.dataset.dia;
+      if (dia && dia !== currentDia) {
+        console.log('[Jogos] Aba clicada:', dia);
+        lastFetchTime = 0; // Reseta cache para buscar dados novos
+        loadJogosDoDia(dia);
+      }
+    });
+  });
 });
 
 // Inicia o app ao final de todos os scripts
 // Inicia o app assim que o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
-// Garantia extra: esconde o splash se algo der muito errado após 3 segundos
-setTimeout(() => hide('splash'), 3000);
-// boot() já é chamado no window.onload
+  console.log('[App] DOMContentLoaded');
+  // Garantia extra: esconde o splash se algo der muito errado após 3 segundos
+  setTimeout(() => hide('splash'), 3000);
+  // boot() já é chamado no window.onload
 });
