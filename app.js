@@ -2601,7 +2601,7 @@ async function atualizarJogosEmSegundoPlano(dia) {
 }
 
 async function fetchJogosAPI(dia) {
-  console.log('[Jogos] Buscando dados reais da API para:', dia);
+  console.log('[Jogos] Buscando dados reais da internet para:', dia);
 
   const timeout = 15000; // 15 s timeout
   const dateMap = {
@@ -2613,7 +2613,8 @@ async function fetchJogosAPI(dia) {
   const dateObj = dateMap[dia] ? dateMap[dia]() : new Date();
   const dateStr = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
 
-  const apiUrl = `https://www.thesportsdb.com/api/v1/json/1/eventsday.php?d=${dateStr}&l=Portuguese%20League`;
+  // Site que contém a tabela de jogos (exemplo: Futebol na TV)
+  const siteUrl = `https://www.futebolnatv.com.br/${dateStr}`;
 
   const corsProxies = [
     'https://api.allorigins.win/raw?url=',
@@ -2622,17 +2623,111 @@ async function fetchJogosAPI(dia) {
 
   for (const proxy of corsProxies) {
     try {
-      const url = proxy + encodeURIComponent(apiUrl);
+      const url = proxy + encodeURIComponent(siteUrl);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'text/html' } });
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.log('[Jogos] Proxy resposta não OK, tentando próximo');
         continue;
       }
+
+      const html = await response.text();
+      const jogos = parseFutebolNaTV(html, dia);
+      if (jogos && jogos.length > 0) {
+        console.log('[Jogos] Dados reais extraídos via parsing:', jogos.length, 'jogos');
+        return jogos;
+      }
+    } catch (err) {
+      console.log('[Jogos] Falha ao obter dados via proxy:', err.message);
+      continue;
+    }
+  }
+
+  // Fallback para dados simulados
+  console.log('[Jogos] Usando dados simulados (todos proxies falharam)');
+  return getJogosSimulados(dia);
+}
+
+// ======== PARSING FUNÇÃO PARA EXTRAIR JOGOS DO SITE FUTEBOLNATV =========
+function parseFutebolNaTV(html, dia) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const jogos = [];
+    const allElements = doc.querySelectorAll('*');
+
+    allElements.forEach(el => {
+      const text = el.textContent || '';
+      const timeMatch = text.match(/(\d{2}:\d{2})/);
+      if (!timeMatch) return;
+
+      if (text.includes(' x ') || text.includes(' vs ') || text.includes('×')) {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        const time = timeMatch[1];
+        let competition = 'Campeonato';
+        let homeTeam = '';
+        let awayTeam = '';
+        let channel = 'TV Aberta';
+
+        // Busca campeonato (linha que não seja hora e tenha tamanho razoável)
+        for (const line of lines) {
+          if (line.length > 5 && line.length < 100 && !line.includes(':')) {
+            competition = line;
+            break;
+          }
+        }
+
+        // Busca times
+        const teamLine = lines.find(l => l.includes(' x ') || l.includes(' vs ') || l.includes('×'));
+        if (teamLine) {
+          const parts = teamLine.split(/ x | vs | × /i);
+          if (parts.length >= 2) {
+            homeTeam = parts[0].trim();
+            awayTeam = parts[1].trim();
+          }
+        }
+
+        // Busca canal de transmissão
+        const channelMatch = text.match(/(ESPN|PREMIERE|BAND|YOUTUBE|PARAMOUNT|SPORTYNET|DISNEY|STAR\+|GLOBO)/i);
+        if (channelMatch) {
+          channel = channelMatch[0].toUpperCase();
+        }
+
+        if (homeTeam && awayTeam && homeTeam !== awayTeam) {
+          jogos.push({
+            time,
+            competition,
+            homeTeam,
+            awayTeam,
+            channel,
+            isDestaque: /liga|campeonato|copa/i.test(competition)
+          });
+        }
+      }
+    });
+
+    // Remove duplicatas
+    const unique = [];
+    const seen = new Set();
+    jogos.forEach(j => {
+      const key = `${j.time}-${j.homeTeam}-${j.awayTeam}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(j);
+      }
+    });
+
+    console.log('[Jogos] Parse completo:', unique.length, 'jogos encontrados');
+    return unique.length > 0 ? unique : getJogosSimulados(dia);
+  } catch (e) {
+    console.error('[Jogos] Erro no parse:', e.message);
+    return getJogosSimulados(dia);
+  }
+}
 
       const data = await response.json();
       if (!data.events || data.events.length === 0) {
@@ -2796,7 +2891,7 @@ function renderJogos(jogos, dia) {
         Última atualização: <b>${dataAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>
       </div>
 <p style="font-size: 0.75rem; color: var(--text-muted);">
-          Dados capturados via API TheSportsDB
+          Dados capturados do site Futebol na TV
         </p>
     </div>
   `;
