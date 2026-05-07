@@ -341,139 +341,296 @@
       </div>
     </div>
 
-    <!-- WHATSAPP -->
-    <div id="page-whatsapp" class="page">
-      <div class="page-header">
-        <div style="display: flex; align-items: center; gap: 15px;">
-          <h1>WhatsApp</h1>
-          <div class="status-badge red" id="wa-status-badge">Desconectado</div>
-        </div>
-        <p>Disparo de mensagens e integração via Evolution API</p>
+<!-- WHATSAPP -->
+<div id="page-whatsapp" class="page">
+  <div class="page-header">
+    <div style="display: flex; align-items: center; gap: 15px;">
+      <h1>📱 WhatsApp Manager</h1>
+      <div class="status-badge red" id="wa-status-badge">Desconectado</div>
+    </div>
+    <p>Disparo de mensagens e integração via Evolution API</p>
+  </div>
+
+  <div class="dash-grid wa-main-grid">
+
+  <!-- CONEXÃO -->
+  <div class="card">
+    <div class="card-header"><h3>📱 Conexão WhatsApp</h3></div>
+    <div class="wa-connection-box" id="wa-connection-box">
+      <div class="field-group" style="max-width: 300px; margin-bottom: 15px;">
+        <label>Nome da Instância</label>
+        <input type="text" id="wa-instance-name" value="gestorflex" readonly style="background: var(--bg); color: var(--text-muted); cursor: not-allowed;">
       </div>
+      <button class="btn-primary" id="btn-wa-connect" style="background: #25D366; color: #fff; box-shadow: 0 4px 24px rgba(37,211,102,0.3);">Conectar WhatsApp</button>
+      <div id="wa-qr-container" class="hidden" style="margin-top: 20px; text-align: center; background: #fff; padding: 15px; border-radius: 12px; display: inline-block;">
+        <p style="color: #333; font-weight: 500; margin-bottom: 10px;">Escaneie o QR Code abaixo com seu WhatsApp:</p>
+        <canvas id="wa-qr-canvas"></canvas>
+      </div>
+      <div id="wa-connected-container" class="hidden" style="margin-top: 15px;">
+        <p style="color: #34d399; font-weight: 600; margin-bottom: 15px;">✅ Instância conectada com sucesso!</p>
+        <button class="btn-danger" id="btn-wa-disconnect">Desconectar / Reconectar</button>
+      </div>
+    </div>
+  </div>
 
-      <div class="dash-grid wa-main-grid">
-        
-        <!-- CONEXÃO -->
-        <div class="card">
-          <div class="card-header"><h3>📱 Conexão WhatsApp</h3></div>
-          <div class="wa-connection-box" id="wa-connection-box">
-            <div class="field-group" style="max-width: 300px; margin-bottom: 15px;">
-              <label>Nome da Instância</label>
-              <input type="text" id="wa-instance-name" value="gestorflex" readonly style="background: var(--bg); color: var(--text-muted); cursor: not-allowed;">
-            </div>
-            <button class="btn-primary" id="btn-wa-connect" style="background: #25D366; color: #fff; box-shadow: 0 4px 24px rgba(37,211,102,0.3);">Conectar WhatsApp</button>
-            <div id="wa-qr-container" class="hidden" style="margin-top: 20px; text-align: center; background: #fff; padding: 15px; border-radius: 12px; display: inline-block;">
-              <p style="color: #333; font-weight: 500; margin-bottom: 10px;">Escaneie o QR Code abaixo com seu WhatsApp:</p>
-              <canvas id="wa-qr-canvas"></canvas>
-            </div>
-            <div id="wa-connected-container" class="hidden" style="margin-top: 15px;">
-              <p style="color: #34d399; font-weight: 600; margin-bottom: 15px;">✅ Instância conectada com sucesso!</p>
-              <button class="btn-danger" id="btn-wa-disconnect">Desconectar / Reconectar</button>
-            </div>
+  <div class="dash-grid wa-sub-grid">
+  
+  <!-- CONFIGURAÇÃO DE MENSAGENS POR PERÍODO -->
+  <div class="card">
+    <div class="card-header"><h3>📝 Mensagens por Período</h3></div>
+    <div class="auth-form">
+      
+      <!-- MENSAGEM ANTES DO VENCIMENTO -->
+      <div style="background: var(--card2); padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border);">
+        <h4 style="color: #10B981; margin-bottom: 10px;">⏰ ANTES do Vencimento</h4>
+        <div class="field-group">
+          <label>Mensagem (1-3 dias antes)</label>
+          <textarea id="wa-msg-antes" rows="3" placeholder="Ex: Olá {nome}! Seu plano {plano} vence em {dias} dias ({vencimento}). Valor: R$ {valor}. Renove agora!"></textarea>
+        </div>
+      </div>
+      
+      <!-- MENSAGEM NO DIA DO VENCIMENTO -->
+      <div style="background: var(--card2); padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border);">
+        <h4 style="color: #F59E0B; margin-bottom: 10px;">📅 NO DIA do Vencimento</h4>
+        <div class="field-group">
+          <label>Mensagem para hoje</label>
+          <textarea id="wa-msg-hoje" rows="3" placeholder="Ex: Olá {nome}! Hoje é o dia do vencimento do seu plano {plano}. Valor: R$ {valor}. Não perca o prazo!"></textarea>
+        </div>
+      </div>
+      
+      <!-- MENSAGEM APÓS VENCIMENTO -->
+      <div style="background: var(--card2); padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border);">
+        <h4 style="color: #EF4444; margin-bottom: 10px;">🔴 APÓS o Vencimento</h4>
+        <div class="field-group">
+          <label>Mensagem (1, 3, 7 dias após)</label>
+          <textarea id="wa-msg-apos" rows="3" placeholder="Ex: Olá {nome}! Seu plano {plano} venceu há {dias} dias. Valor: R$ {valor}. Regularize já!"></textarea>
+        </div>
+      </div>
+      
+      <div class="field-group">
+        <label>📚 Variáveis disponíveis:</label>
+        <div style="font-size: 0.8rem; color: var(--text-muted); background: var(--card2); padding: 8px; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 8px;">
+          <code style="color:#7C3AED;">{nome}</code>
+          <code style="color:#7C3AED;">{vencimento}</code>
+          <code style="color:#7C3AED;">{valor}</code>
+          <code style="color:#7C3AED;">{plano}</code>
+          <code style="color:#7C3AED;">{dias}</code>
+          <code style="color:#7C3AED;">{whatsapp}</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPLOAD DE MÍDIAS -->
+  <div class="card">
+    <div class="card-header"><h3>📎 Upload de Mídias</h3></div>
+    <div class="auth-form">
+      
+      <!-- IMAGEM -->
+      <div style="background: var(--card2); padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border);">
+        <h4 style="color: #7C3AED; margin-bottom: 10px;">🖼️ Imagem para Mensagens</h4>
+        <div class="field-group">
+          <label>Opção 1: URL da Imagem</label>
+          <input type="text" id="wa-image-url" placeholder="https://exemplo.com/imagem.jpg">
+        </div>
+        <div style="margin: 10px 0;">
+          <label style="display: block; margin-bottom: 8px;">Ou Opção 2: Upload de Arquivo</label>
+          <input type="file" id="wa-image-file" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('wa-image-file').click()" style="width: 100%;">
+            📷 Escolher Imagem do Computador
+          </button>
+          <div id="wa-image-preview" style="margin-top: 10px; display: none;">
+            <img id="wa-image-preview-img" src="" alt="Pré-visualização" style="max-width: 200px; border-radius: 8px;">
+            <p style="color: #10B981; font-size: 0.85rem; margin-top: 5px;">✅ Imagem carregada com sucesso!</p>
           </div>
+        </div>
+      </div>
+      
+      <!-- ÁUDIO -->
+      <div style="background: var(--card2); padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border);">
+        <h4 style="color: #F59E0B; margin-bottom: 10px;">🎵 Áudio para Mensagens</h4>
+        <div class="field-group">
+          <label>Opção 1: URL do Áudio</label>
+          <input type="text" id="wa-audio-url" placeholder="https://exemplo.com/audio.mp3">
+        </div>
+        <div style="margin: 10px 0;">
+          <label style="display: block; margin-bottom: 8px;">Ou Opção 2: Upload de Arquivo</label>
+          <input type="file" id="wa-audio-file" accept="audio/*" style="display: none;" onchange="handleAudioUpload(this)">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('wa-audio-file').click()" style="width: 100%;">
+            🎤 Escolher Áudio do Computador
+          </button>
+          <div id="wa-audio-preview" style="margin-top: 10px; display: none;">
+            <audio id="wa-audio-preview-audio" controls style="width: 100%;"></audio>
+            <p style="color: #10B981; font-size: 0.85rem; margin-top: 5px;">✅ Áudio carregado com sucesso!</p>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display:flex; gap:10px; margin-top: 10px;">
+        <button class="btn-primary" id="btn-wa-save-media" style="flex:1;">💾 Salvar Mídias</button>
+        <button class="btn-secondary" id="btn-wa-test-media" style="flex:1;">🧪 Testar Envio</button>
+      </div>
+    </div>
+  </div>
+  </div>
+  
+  <div class="dash-grid wa-sub-grid">
+  <!-- DISPARO AUTOMÁTICO -->
+  <div class="card">
+    <div class="card-header"><h3>⚙️ Disparo Automático</h3></div>
+    <div class="auth-form">
+      <div class="field-group">
+        <label>🕐 Horário do disparo diário</label>
+        <input type="time" id="wa-auto-time">
+      </div>
+      
+      <div class="field-group">
+        <label>📅 Enviar ANTES do vencimento (dias)</label>
+        <div style="display:flex; gap:15px; margin-top:5px; flex-wrap: wrap;">
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="1" class="wa-cb-antes"> 1 dia antes
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="2" class="wa-cb-antes"> 2 dias antes
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="3" class="wa-cb-antes"> 3 dias antes
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="5" class="wa-cb-antes"> 5 dias antes
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="7" class="wa-cb-antes"> 7 dias antes
+          </label>
+        </div>
+      </div>
+      
+      <div class="field-group">
+        <label>📅 Enviar NO DIA do vencimento</label>
+        <div style="margin-top:5px;">
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="0" class="wa-cb-hoje" checked> Enviar no dia do vencimento
+          </label>
+        </div>
+      </div>
+      
+      <div class="field-group">
+        <label>🔴 Enviar DEPOIS do vencimento (dias)</label>
+        <div style="display:flex; gap:15px; margin-top:5px; flex-wrap: wrap;">
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="1" class="wa-cb-depois"> 1 dia após
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="3" class="wa-cb-depois"> 3 dias após
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="5" class="wa-cb-depois"> 5 dias após
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="7" class="wa-cb-depois"> 7 dias após
+          </label>
+          <label class="cb-label" style="display: flex; align-items: center; gap: 5px;">
+            <input type="checkbox" value="15" class="wa-cb-depois"> 15 dias após
+          </label>
+        </div>
+      </div>
+      
+      <div class="field-group">
+        <label>⏱️ Intervalo entre mensagens (minutos)</label>
+        <select id="wa-auto-interval">
+          <option value="0.5">30 segundos</option>
+          <option value="1">1 minuto</option>
+          <option value="2">2 minutos</option>
+          <option value="3">3 minutos</option>
+          <option value="5">5 minutos</option>
+          <option value="10">10 minutos</option>
+        </select>
+      </div>
+      
+      <div style="display:flex; align-items:center; gap:10px; margin-top:10px; background:var(--card2); padding:10px 14px; border-radius:10px; border:1px solid var(--border);">
+        <label class="switch">
+          <input type="checkbox" id="wa-auto-active">
+          <span class="slider round"></span>
+        </label>
+        <span style="font-weight:600; font-size:0.9rem;">Ativar Disparo Automático</span>
+      </div>
+      
+      <button class="btn-primary" id="btn-wa-save-auto" style="margin-top: 10px; width: 100%;">💾 Salvar Configurações</button>
+    </div>
+  </div>
         </div>
 
         <div class="dash-grid wa-sub-grid">
-          <!-- CONFIGURAÇÃO DE MENSAGENS -->
-          <div class="card">
-            <div class="card-header"><h3>📝 Configuração de Mensagens</h3></div>
-            <div class="auth-form">
-              <div class="field-group">
-                <label>Mensagem ANTES do vencimento</label>
-                <textarea id="wa-msg-antes" rows="4" placeholder="Ex: Olá {nome}! Seu plano {plano} vence em {dias} dias ({vencimento}). Valor: R$ {valor}. Renove agora!"></textarea>
-              </div>
-              <div class="field-group">
-                <label>Mensagem APÓS o vencimento</label>
-                <textarea id="wa-msg-apos" rows="4" placeholder="Ex: Olá {nome}! Seu plano {plano} venceu há {dias} dias. Valor: R$ {valor}."></textarea>
-              </div>
-              <div class="field-group">
-                <label>Variáveis disponíveis:</label>
-                <div style="font-size: 0.8rem; color: var(--text-muted); background: var(--card2); padding: 8px; border-radius: 8px;">
-                  <code style="color:var(--purple-light);">{nome}</code>, <code style="color:var(--purple-light);">{vencimento}</code>, <code style="color:var(--purple-light);">{valor}</code>, <code style="color:var(--purple-light);">{plano}</code>, <code style="color:var(--purple-light);">{dias}</code>
-                </div>
-              </div>
-              <div class="field-group">
-                <label>Anexar Imagem (URL)</label>
-                <input type="text" id="wa-msg-image" placeholder="https://link-da-imagem.com/img.jpg">
-              </div>
-              <div class="field-group">
-                <label>Anexar Áudio (URL do .mp3 ou .ogg)</label>
-                <input type="text" id="wa-msg-audio" placeholder="https://link-do-audio.com/audio.mp3">
-              </div>
-              <div style="display:flex; gap:10px; margin-top: 10px;">
-                <button class="btn-primary" id="btn-wa-save-msg" style="flex:1;">Salvar Textos</button>
-                <button class="btn-secondary" id="btn-wa-preview" style="flex:1;">Pré-visualizar</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- DISPARO AUTOMÁTICO -->
-          <div class="card">
-            <div class="card-header"><h3>⚙️ Disparo Automático</h3></div>
-            <div class="auth-form">
-              <div class="field-group">
-                <label>Horário do disparo diário</label>
-                <input type="time" id="wa-auto-time">
-              </div>
-              <div class="field-group">
-                <label>Enviar ANTES do vencimento (dias)</label>
-                <div style="display:flex; gap:15px; margin-top:5px;">
-                  <label class="cb-label"><input type="checkbox" value="1" class="wa-cb-antes"> 1</label>
-                  <label class="cb-label"><input type="checkbox" value="2" class="wa-cb-antes"> 2</label>
-                  <label class="cb-label"><input type="checkbox" value="3" class="wa-cb-antes"> 3</label>
-                  <label class="cb-label"><input type="checkbox" value="5" class="wa-cb-antes"> 5</label>
-                </div>
-              </div>
-              <div class="field-group">
-                <label>Enviar DEPOIS do vencimento (dias)</label>
-                <div style="display:flex; gap:15px; margin-top:5px;">
-                  <label class="cb-label"><input type="checkbox" value="1" class="wa-cb-depois"> 1</label>
-                  <label class="cb-label"><input type="checkbox" value="2" class="wa-cb-depois"> 2</label>
-                  <label class="cb-label"><input type="checkbox" value="3" class="wa-cb-depois"> 3</label>
-                  <label class="cb-label"><input type="checkbox" value="5" class="wa-cb-depois"> 5</label>
-                </div>
-              </div>
-              <div class="field-group">
-                <label>Intervalo entre mensagens (minutos)</label>
-                <select id="wa-auto-interval">
-                  <option value="1">1 minuto</option>
-                  <option value="2">2 minutos</option>
-                  <option value="3">3 minutos</option>
-                  <option value="5">5 minutos</option>
-                </select>
-              </div>
-              <div style="display:flex; align-items:center; gap:10px; margin-top:10px; background:var(--card2); padding:10px 14px; border-radius:10px; border:1px solid var(--border);">
-                <label class="switch">
-                  <input type="checkbox" id="wa-auto-active">
-                  <span class="slider round"></span>
-                </label>
-                <span style="font-weight:600; font-size:0.9rem;">Ativar Disparo Automático</span>
-              </div>
-              <button class="btn-primary" id="btn-wa-save-auto" style="margin-top: 10px;">Salvar Configurações</button>
-            </div>
-          </div>
+  <!-- DISPARO MANUAL -->
+  <div class="card">
+    <div class="card-header"><h3>🚀 Disparo Manual</h3></div>
+    <div class="auth-form">
+      
+      <div class="field-group">
+        <label>📋 Tipo de Envio</label>
+        <select id="wa-manual-type" style="margin-bottom: 10px;">
+          <option value="mensagem">Enviar Mensagem Personalizada</option>
+          <option value="lembrete">Enviar Lembrete de Vencimento</option>
+          <option value="cobranca">Enviar Cobrança</option>
+          <option value="promocao">Enviar Promoção</option>
+        </select>
+      </div>
+      
+      <div class="field-group">
+        <label>👥 Selecionar Público Alvo</label>
+        <select id="wa-manual-filter">
+          <option value="todos">Todos os Clientes</option>
+          <option value="ativos">Clientes Ativos</option>
+          <option value="pendentes">Clientes Pendentes</option>
+          <option value="vencendo_hoje">Vencendo Hoje</option>
+          <option value="vencendo_3dias">Vencendo em até 3 dias</option>
+          <option value="vencendo_7dias">Vencendo em até 7 dias</option>
+          <option value="vencidos_7dias">Vencidos há até 7 dias</option>
+          <option value="vencidos_15dias">Vencidos há até 15 dias</option>
+          <option value="vencidos">Todos Vencidos</option>
+          <option value="aniversariantes">Aniversariantes do Mês</option>
+        </select>
+      </div>
+      
+      <div class="field-group">
+        <label>📝 Personalizar Mensagem (opcional)</label>
+        <textarea id="wa-manual-msg" rows="3" placeholder="Deixe em branco para usar a mensagem padrão do tipo selecionado. Use as variáveis {nome}, {valor}, {vencimento}, etc."></textarea>
+      </div>
+      
+      <div class="field-group">
+        <label>📊 Filtro por Plano (opcional)</label>
+        <select id="wa-manual-plano">
+          <option value="">Todos os Planos</option>
+          <!-- Preenchido dinamicamente -->
+        </select>
+      </div>
+      
+      <div class="field-group">
+        <label>⏰ Agendar Envio</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="radio" name="wa-schedule" value="now" checked> Enviar Agora
+          <input type="radio" name="wa-schedule" value="later"> Agendar
+          <input type="datetime-local" id="wa-schedule-datetime" style="flex: 1; display: none;">
         </div>
-
-        <div class="dash-grid wa-sub-grid">
-          <!-- DISPARO MANUAL -->
-          <div class="card">
-            <div class="card-header"><h3>🚀 Disparo Manual</h3></div>
-            <div class="auth-form">
-              <div class="field-group">
-                <label>Selecionar Público Alvo</label>
-                <select id="wa-manual-filter">
-                  <option value="todos">Todos os Clientes</option>
-                  <option value="vencendo_hoje">Vencendo Hoje</option>
-                  <option value="vencidos">Clientes Vencidos</option>
-                </select>
-              </div>
-              <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:5px;">Clientes que receberão: <strong id="wa-manual-count" style="color:var(--text);">0</strong></p>
-              <div style="display:flex; gap:10px; margin-top: 10px;">
-                <button class="btn-primary" id="btn-wa-send-now" style="background:#25D366; color:#fff; flex:1; box-shadow: 0 4px 24px rgba(37,211,102,0.3);">Enviar Agora</button>
-                <button class="btn-secondary" id="btn-wa-add-queue" style="flex:1;">Adicionar à Fila</button>
-              </div>
-            </div>
-          </div>
+      </div>
+      
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:5px;">
+        <span id="wa-manual-count" style="color:var(--text); font-weight: bold;">0</span> clientes serão enviados
+      </p>
+      
+      <div style="display:flex; gap:10px; margin-top: 10px; flex-wrap: wrap;">
+        <button class="btn-primary" id="btn-wa-send-now" style="background:#25D366; color:#fff; flex:1; min-width: 140px; box-shadow: 0 4px 24px rgba(37,211,102,0.3);">
+          🚀 Enviar Agora
+        </button>
+        <button class="btn-secondary" id="btn-wa-add-queue" style="flex:1; min-width: 140px;">
+          ⏱️ Adicionar à Fila
+        </button>
+        <button class="btn-secondary" id="btn-wa-preview-manual" style="flex:1; min-width: 140px;">
+          👁️ Pré-visualizar
+        </button>
+      </div>
+    </div>
+  </div>
 
           <!-- FILA DE ENVIO -->
           <div class="card">

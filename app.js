@@ -1498,54 +1498,120 @@ $('btn-wa-disconnect').addEventListener('click', async () => {
 });
 
 async function loadWaConfig() {
+  console.log('[WhatsApp] Carregando configurações...');
   const { data, error } = await db.from('wa_config').select('*').limit(1);
+  
   if (!error && data && data.length > 0) {
     waConfigData = data[0];
+    console.log('[WhatsApp] Configurações carregadas:', waConfigData);
+    
+    // Mensagens
     $('wa-msg-antes').value = waConfigData.msg_antes || '';
+    $('wa-msg-hoje').value = waConfigData.msg_hoje || '';
     $('wa-msg-apos').value = waConfigData.msg_apos || '';
-    $('wa-msg-image').value = waConfigData.msg_image || '';
-    $('wa-msg-audio').value = waConfigData.msg_audio || '';
+    
+    // Mídias (URLs ou base64)
+    if (waConfigData.msg_image) {
+      if (waConfigData.msg_image.startsWith('data:')) {
+        waImageBase64 = waConfigData.msg_image;
+        $('wa-image-preview').style.display = 'block';
+        $('wa-image-preview-img').src = waImageBase64;
+      } else {
+        $('wa-msg-image').value = waConfigData.msg_image;
+      }
+    }
+    
+    if (waConfigData.msg_audio) {
+      if (waConfigData.msg_audio.startsWith('data:')) {
+        waAudioBase64 = waConfigData.msg_audio;
+        $('wa-audio-preview').style.display = 'block';
+        $('wa-audio-preview-audio').src = waAudioBase64;
+      } else {
+        $('wa-msg-audio').value = waConfigData.msg_audio;
+      }
+    }
+    
+    // Configurações de disparo
     $('wa-auto-time').value = waConfigData.auto_time || '';
     $('wa-auto-interval').value = waConfigData.auto_interval || '1';
     $('wa-auto-active').checked = waConfigData.auto_active || false;
-
+    
+    // Carrega checkboxes de dias ANTES
     const dAntes = (waConfigData.dias_antes || '').split(',');
-    document.querySelectorAll('.wa-cb-antes').forEach(cb => cb.checked = dAntes.includes(cb.value));
-
+    document.querySelectorAll('.wa-cb-antes').forEach(cb => {
+      cb.checked = dAntes.includes(cb.value);
+    });
+    
+    // Carrega checkbox de HOJE
+    const enviarHoje = waConfigData.enviar_hoje !== 'false'; // Padrão é true
+    document.querySelectorAll('.wa-cb-hoje').forEach(cb => {
+      cb.checked = enviarHoje;
+    });
+    
+    // Carrega checkboxes de dias DEPOIS
     const dDepois = (waConfigData.dias_depois || '').split(',');
-    document.querySelectorAll('.wa-cb-depois').forEach(cb => cb.checked = dDepois.includes(cb.value));
-  } else if (error && error.code === '42P01') {
-    toast('Tabela wa_config não existe. Execute o SQL de configuração.', 'error');
+    document.querySelectorAll('.wa-cb-depois').forEach(cb => {
+      cb.checked = dDepois.includes(cb.value);
+    });
+    
+    // Carrega planos no select de filtro
+    loadWaPlanosFilter();
+    
+    console.log('[WhatsApp] Configurações carregadas com sucesso');
+  } else {
+    console.log('[WhatsApp] Nenhuma configuração encontrada');
   }
 }
 
+// Carrega planos no filtro do WhatsApp
+async function loadWaPlanosFilter() {
+  const select = $('wa-manual-plano');
+  if (!select || !allPlanos) return;
+  
+  select.innerHTML = '<option value="">Todos os Planos</option>';
+  allPlanos.forEach(plano => {
+    select.innerHTML += `<option value="${plano.nome}">${plano.nome}</option>`;
+  });
+}
+
 $('btn-wa-save-msg').addEventListener('click', async () => {
+  console.log('[WhatsApp] Salvando mensagens...');
+  
   const payload = {
     msg_antes: $('wa-msg-antes').value,
+    msg_hoje: $('wa-msg-hoje').value,
     msg_apos: $('wa-msg-apos').value,
-    msg_image: $('wa-msg-image').value,
-    msg_audio: $('wa-msg-audio').value,
+    msg_image: waImageBase64 || $('wa-image-url').value,
+    msg_audio: waAudioBase64 || $('wa-audio-url').value,
   };
+  
   await saveWaConfig(payload);
-  toast('Textos salvos com sucesso!', 'success');
+  toast('Textos e mídias salvas com sucesso!', 'success');
 });
 
 $('btn-wa-save-auto').addEventListener('click', async () => {
+  console.log('[WhatsApp] Salvando configurações de disparo...');
+  
   const diasAntes = Array.from(document.querySelectorAll('.wa-cb-antes:checked')).map(cb => cb.value).join(',');
   const diasDepois = Array.from(document.querySelectorAll('.wa-cb-depois:checked')).map(cb => cb.value).join(',');
+  const enviarHoje = document.querySelector('.wa-cb-hoje:checked');
 
   const payload = {
     auto_time: $('wa-auto-time').value,
     auto_interval: $('wa-auto-interval').value,
     auto_active: $('wa-auto-active').checked,
     dias_antes: diasAntes,
-    dias_depois: diasDepois
+    dias_depois: diasDepois,
+    enviar_hoje: enviarHoje ? 'true' : 'false'
   };
+  
   await saveWaConfig(payload);
   toast('Configurações de disparo salvas!', 'success');
 });
 
 async function saveWaConfig(payload) {
+  console.log('[WhatsApp] Salvando:', payload);
+  
   if (waConfigData && waConfigData.id) {
     await db.from('wa_config').update(payload).eq('id', waConfigData.id);
   } else {
@@ -1560,7 +1626,8 @@ function processWaMessage(template, cliente) {
   msg = msg.replace(/{vencimento}/g, cliente.vencimento ? new Date(cliente.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '');
   msg = msg.replace(/{valor}/g, parseFloat(cliente.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
   msg = msg.replace(/{plano}/g, cliente.plano || '');
-
+  msg = msg.replace(/{whatsapp}/g, cliente.whatsapp || '');
+  
   const dias = Math.abs(diasAteVencimento(cliente.vencimento));
   msg = msg.replace(/{dias}/g, dias);
 
@@ -2233,6 +2300,206 @@ $('btn-meta-disconnect')?.addEventListener('click', async () => {
   $('meta-status-badge').className = 'status-badge red';
   hide('meta-dashboard');
   toast('Meta Ads desconectado!', 'success');
+});
+
+// ============================================
+// WHATSAPP - FUNÇÕES DE UPLOAD E RECURSOS ADICIONAIS
+// ============================================
+
+// Variáveis globais para uploads
+let waImageBase64 = null;
+let waAudioBase64 = null;
+
+// Handle image upload
+window.handleImageUpload = (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    waImageBase64 = e.target.result;
+    $('wa-image-preview').style.display = 'block';
+    $('wa-image-preview-img').src = waImageBase64;
+    $('wa-image-url').value = ''; // Limpa URL se tiver upload
+    console.log('[WhatsApp] Imagem carregada:', file.name);
+  };
+  reader.readAsDataURL(file);
+};
+
+// Handle audio upload
+window.handleAudioUpload = (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    waAudioBase64 = e.target.result;
+    $('wa-audio-preview').style.display = 'block';
+    $('wa-audio-preview-audio').src = waAudioBase64;
+    $('wa-audio-url').value = ''; // Limpa URL se tiver upload
+    console.log('[WhatsApp] Áudio carregado:', file.name);
+  };
+  reader.readAsDataURL(file);
+};
+
+// Save media configurations
+$('btn-wa-save-media')?.addEventListener('click', async () => {
+  const imageUrl = $('wa-image-url').value.trim();
+  const audioUrl = $('wa-audio-url').value.trim();
+  
+  // Salva as URLs ou base64 no banco
+  const payload = {};
+  if (waImageBase64 || imageUrl) {
+    payload.msg_image = waImageBase64 || imageUrl;
+  }
+  if (waAudioBase64 || audioUrl) {
+    payload.msg_audio = waAudioBase64 || audioUrl;
+  }
+  
+  if (Object.keys(payload).length === 0) {
+    return toast('Selecione uma imagem ou áudio para salvar', 'error');
+  }
+  
+  // Atualiza configuração
+  if (waConfigData && waConfigData.id) {
+    await db.from('wa_config').update(payload).eq('id', waConfigData.id);
+  }
+  
+  toast('Mídias salvas com sucesso!', 'success');
+});
+
+// Test media send
+$('btn-wa-test-media')?.addEventListener('click', async () => {
+  if (waStatus !== 'conectado') return toast('WhatsApp não está conectado!', 'error');
+  
+  const testNumber = prompt('Digite o número para teste (apenas números, com 55):', '5511999999999');
+  if (!testNumber) return;
+  
+  const imageUrl = waImageBase64 || $('wa-image-url').value.trim();
+  const audioUrl = waAudioBase64 || $('wa-audio-url').value.trim();
+  
+  toast('Enviando teste...', 'info');
+  
+  try {
+    const evolutionUrl = 'https://evolution-api.com'; // Ajuste conforme sua API
+    const instance = 'gestorflex';
+    
+    // Envia imagem se existir
+    if (imageUrl) {
+      await fetch(`${evolutionUrl}/message/sendMedia/${instance}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: testNumber,
+          mediaUrl: imageUrl,
+          mediaType: 'image'
+        })
+      });
+    }
+    
+    // Envia áudio se existir
+    if (audioUrl) {
+      await fetch(`${evolutionUrl}/message/sendMedia/${instance}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: testNumber,
+          mediaUrl: audioUrl,
+          mediaType: 'audio'
+        })
+      });
+    }
+    
+    toast('Teste enviado com sucesso!', 'success');
+  } catch (e) {
+    console.error('Erro no teste:', e);
+    toast('Erro ao enviar teste: ' + e.message, 'error');
+  }
+});
+
+// Atualiza contador de clientes no disparo manual
+['wa-manual-filter', 'wa-manual-plano', 'wa-manual-type'].forEach(id => {
+  const el = $(id);
+  if (el) {
+    el.addEventListener('change', updateWaManualCount);
+    el.addEventListener('input', updateWaManualCount);
+  }
+});
+
+async function updateWaManualCount() {
+  const filter = $('wa-manual-filter').value;
+  const plano = $('wa-manual-plano').value;
+  const clients = filterWaClients(filter, plano);
+  $('wa-manual-count').textContent = clients.length;
+}
+
+// Filtra clientes para disparo manual
+function filterWaClients(filter, plano = '') {
+  if (!allClientes || allClientes.length === 0) return [];
+  
+  let filtered = allClientes;
+  
+  // Filtra por plano
+  if (plano) {
+    filtered = filtered.filter(c => c.plano === plano);
+  }
+  
+  // Filtra por tipo de cliente
+  switch (filter) {
+    case 'ativos':
+      return filtered.filter(c => c.status === 'Ativo');
+    case 'pendentes':
+      return filtered.filter(c => c.status === 'Pendente');
+    case 'vencendo_hoje':
+      return filtered.filter(c => diasAteVencimento(c.vencimento) === 0);
+    case 'vencendo_3dias':
+      return filtered.filter(c => diasAteVencimento(c.vencimento) >= 0 && diasAteVencimento(c.vencimento) <= 3);
+    case 'vencendo_7dias':
+      return filtered.filter(c => diasAteVencimento(c.vencimento) >= 0 && diasAteVencimento(c.vencimento) <= 7);
+    case 'vencidos_7dias':
+      return filtered.filter(c => diasAteVencimento(c.vencimento) < 0 && Math.abs(diasAteVencimento(c.vencimento)) <= 7);
+    case 'vencidos_15dias':
+      return filtered.filter(c => diasAteVencimento(c.vencimento) < 0 && Math.abs(diasAteVencimento(c.vencimento)) <= 15);
+    case 'vencidos':
+      return filtered.filter(c => diasAteVencimento(c.vencimento) < 0);
+    case 'aniversariantes':
+      const mesAtual = new Date().getMonth() + 1;
+      return filtered.filter(c => {
+        if (!c.aniversario) return false;
+        const mesAniv = new Date(c.aniversario).getMonth() + 1;
+        return mesAniv === mesAtual;
+      });
+    default:
+      return filtered;
+  }
+}
+
+// Preview de mensagem manual
+$('btn-wa-preview-manual')?.addEventListener('click', () => {
+  const filter = $('wa-manual-filter').value;
+  const clients = filterWaClients(filter);
+  
+  if (clients.length === 0) {
+    return toast('Nenhum cliente para este filtro', 'error');
+  }
+  
+  const client = clients[0];
+  const template = $('wa-manual-msg').value || $('wa-msg-hoje').value || '';
+  const msg = processWaMessage(template, client);
+  
+  alert(`Pré-visualização para ${client.nome}:\n\n${msg}`);
+});
+
+// Toggle agendamento
+document.querySelectorAll('input[name="wa-schedule"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const datetime = $('wa-schedule-datetime');
+    if (radio.value === 'later') {
+      datetime.style.display = 'block';
+    } else {
+      datetime.style.display = 'none';
+    }
+  });
 });
 
 // Inicia o app ao final de todos os scripts
