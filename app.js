@@ -2514,25 +2514,23 @@ document.querySelectorAll('input[name="wa-schedule"]').forEach(radio => {
 function getJogosSimulados(dia) {
   const jogosReais = {
     'ontem': [
-      { time: '10:00', competition: '🇧🇷 Campeonato Paulista A2', homeTeam: 'Juventus SP', awayTeam: 'Ferroviária', channel: 'XSPORTS', isDestaque: true },
-      { time: '19:00', competition: '🇧🇷 Copa do Nordeste', homeTeam: 'Confiança', awayTeam: 'Fortaleza', channel: 'SPORTYNET', isDestaque: true },
-      { time: '21:00', competition: '🇧🇷 Copa Libertadores', homeTeam: 'Coquimbo Unido', awayTeam: 'Universitario', channel: 'PARAMOUNT+', isDestaque: true }
+      { time: '16:00', competition: '🇪🇺 UEFA Champions League', homeTeam: 'Real Madrid', awayTeam: 'Manchester City', channel: 'MAX / TNT', isDestaque: true },
+      { time: '19:00', competition: '🇧🇷 Copa do Brasil', homeTeam: 'Flamengo', awayTeam: 'Bahia', channel: 'PREMIERE', isDestaque: true },
+      { time: '21:30', competition: '🇧🇷 Copa Libertadores', homeTeam: 'Palmeiras', awayTeam: 'Ind. del Valle', channel: 'ESPN', isDestaque: true }
     ],
     'hoje': [
-      { time: '15:00', competition: '🇸🇦 Campeonato Saudita', homeTeam: 'Al Shabab', awayTeam: 'Al-Nassr', channel: 'BANDSPORTS', isDestaque: false },
-      { time: '16:00', competition: '🇪🇺 UEFA Europa League', homeTeam: 'Aston Villa', awayTeam: 'Nottingham Forest', channel: 'YOUTUBE', isDestaque: true },
-      { time: '16:00', competition: '🇪🇺 UEFA Europa League', homeTeam: 'SC Freiburg', awayTeam: 'SC Braga', channel: 'YOUTUBE', isDestaque: true },
-      { time: '19:00', competition: '🇦🇷🇺🇾 Copa Libertadores', homeTeam: 'Platense', awayTeam: 'Peñarol', channel: 'PARAMOUNT+', isDestaque: true },
-      { time: '19:00', competition: '🇧🇷🇪🇨 Copa Libertadores', homeTeam: 'MIRASSOL', awayTeam: 'LDU de QUITO', channel: 'PARAMOUNT+', isDestaque: true },
-      { time: '19:00', competition: '🇨🇱🇧🇷 Copa Sul-Americana', homeTeam: 'O\'HIGGINS', awayTeam: 'SÃO PAULO', channel: 'ESPN', isDestaque: true },
-      { time: '21:30', competition: '🇨🇴🇧🇷 Copa Libertadores', homeTeam: 'INDEPENDIENTE MEDELLÍN', awayTeam: 'FLAMENGO', channel: 'ESPN', isDestaque: true },
-      { time: '21:30', competition: '🇧🇴🇧🇷 Copa Sul-Americana', homeTeam: 'BLOOMING', awayTeam: 'RB BRAGANTINO', channel: 'ESPN 4', isDestaque: true }
+      { time: '15:45', competition: '🇮🇹 Serie A', homeTeam: 'Inter de Milão', awayTeam: 'Milan', channel: 'STAR+', isDestaque: true },
+      { time: '16:00', competition: '🇪🇸 La Liga', homeTeam: 'Barcelona', awayTeam: 'Atlético de Madrid', channel: 'ESPN', isDestaque: true },
+      { time: '19:00', competition: '🇧🇷 Brasileirão Série A', homeTeam: 'Botafogo', awayTeam: 'Vasco', channel: 'GLOBOPLAY', isDestaque: true },
+      { time: '20:00', competition: '🇦gentina Liga Profesional', homeTeam: 'Boca Juniors', awayTeam: 'River Plate', channel: 'ESPN 4', isDestaque: true },
+      { time: '21:30', competition: '🇧🇷 Brasileirão Série A', homeTeam: 'Corinthians', awayTeam: 'São Paulo', channel: 'PREMIERE', isDestaque: true },
+      { time: '21:30', competition: '🇧🇷 Brasileirão Série A', homeTeam: 'Cruzeiro', awayTeam: 'Atlético-MG', channel: 'SPORTV', isDestaque: true }
     ],
     'amanha': [
-      { time: '16:00', competition: '🇧🇷 Campeonato Brasileiro', homeTeam: 'Santos', awayTeam: 'Corinthians', channel: 'PREMIERE', isDestaque: true },
-      { time: '19:00', competition: '🇧🇷 Copa do Brasil', homeTeam: 'Grêmio', awayTeam: 'Fluminense', channel: 'GLOBO', isDestaque: true },
-      { time: '20:00', competition: '🇧🇷 Copa do Brasil', homeTeam: 'São Paulo', awayTeam: 'Corinthians', channel: 'GLOBO', isDestaque: true },
-      { time: '21:30', competition: '🇦🇷 Liga Profesional', homeTeam: 'Boca Juniors', awayTeam: 'River Plate', channel: 'ESPN', isDestaque: true }
+      { time: '12:00', competition: '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League', homeTeam: 'Liverpool', awayTeam: 'Arsenal', channel: 'ESPN', isDestaque: true },
+      { time: '16:00', competition: '🇫🇷 Ligue 1', homeTeam: 'PSG', awayTeam: 'Marseille', channel: 'STAR+', isDestaque: true },
+      { time: '18:30', competition: '🇧🇷 Brasileirão Série B', homeTeam: 'Santos', awayTeam: 'Sport', channel: 'BAND', isDestaque: true },
+      { time: '21:00', competition: '🇺🇸 MLS', homeTeam: 'Inter Miami', awayTeam: 'LA Galaxy', channel: 'APPLE TV', isDestaque: true }
     ]
   };
   return jogosReais[dia] || [];
@@ -2761,7 +2759,7 @@ isDestaque: false
 
 
 function renderJogos(jogos, dia) {
-  const conteudo = $('jogos-conteudo');
+  const conteudo = document.getElementById('jogos-conteudo');
   if (!conteudo) {
     console.error('[Jogos] Elemento jogos-conteudo não encontrado no render');
     return;
@@ -2778,48 +2776,61 @@ function renderJogos(jogos, dia) {
   const hoje = new Date();
   if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
   if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
-  const dataFormatada = hoje.toLocaleDateString('pt-BR');
+  const dataFormatada = hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   let html = `
     <div class="jogos-header">
-      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 16px; flex-wrap: wrap;">
         <div>
-          <div class="jogos-data">${dataFormatada}</div>
-          <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
-            ${jogos.length} jogo${jogos.length !== 1 ? 's' : ''} encontrado${jogos.length !== 1 ? 's' : ''}
+          <div class="jogos-data" style="text-transform: capitalize;">${dataFormatada}</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+            <span style="background: var(--purple-glow); color: var(--purple-light); padding: 2px 8px; border-radius: 4px; font-weight: 700;">${jogos.length}</span>
+            jogos programados
           </div>
         </div>
-        <div style="display: flex; gap: 8px;">
-          <button onclick="copiarJogos('${dia}')" style="background: var(--card2); color: var(--purple-light); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;">📋 Copiar</button>
-          <button onclick="gerarImagemJogos('${dia}')" style="background: linear-gradient(135deg, var(--purple), var(--purple-dark)); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 16px var(--purple-glow);">🖼️ Gerar Imagem</button>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button onclick="copiarJogos('${dia}')" class="btn-action-jogo secondary" style="background: var(--card2); color: var(--text); border: 1px solid var(--border); padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+            <span>📋</span> Copiar Texto
+          </button>
+          <button onclick="gerarImagemJogos('${dia}')" class="btn-action-jogo primary" style="background: linear-gradient(135deg, var(--purple), var(--purple-dark)); color: #fff; border: none; padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px var(--purple-glow); transition: all 0.2s;">
+            <span>🖼️</span> Gerar Agenda
+          </button>
         </div>
       </div>
     </div>
     <div class="jogos-list">
     `;
 
-  jogos.forEach(jogo => {
+  jogos.forEach((jogo, index) => {
     const destaqueClass = jogo.isDestaque ? 'jogo-destaque' : '';
     const homeClass = jogo.isDestaque ? 'destaque' : '';
 
     html += `
-      <div class="jogo-item ${destaqueClass}">
-        <div class="jogo-info">
-          <div class="jogo-horario">🕗 ${jogo.time}</div>
-          <div class="jogo-campeonato">${jogo.competition}</div>
-        </div>
-        <div class="jogo-partida">
-          <div class="jogo-times">
-            <div class="jogo-time ${homeClass}">
-              ${jogo.isDestaque ? '⭐' : ''} ${jogo.homeTeam}
-            </div>
-            <div style="color: var(--text-muted);">x</div>
-            <div class="jogo-time ${homeClass}">
-              ${jogo.awayTeam} ${jogo.isDestaque ? '⭐' : ''}
-            </div>
+      <div class="jogo-item ${destaqueClass}" style="animation: slideUpFade 0.4s ease forwards; animation-delay: ${index * 0.05}s">
+        <div class="jogo-top-info">
+          <div class="jogo-horario">
+            <span class="horario-label" style="font-size: 0.65rem; opacity: 0.7; display: block; line-height: 1;">INÍCIO</span>
+            <span class="horario-val" style="font-size: 1.1rem; font-weight: 800;">${jogo.time}</span>
           </div>
-          <div class="jogo-canal">
-            <span>📺 ${jogo.channel}</span>
+          <div class="jogo-meta" style="flex: 1;">
+            <div class="jogo-campeonato" style="font-size: 0.85rem; font-weight: 600; color: var(--purple-light);">🏆 ${jogo.competition}</div>
+            <div class="jogo-canal" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">📺 ${jogo.channel}</div>
+          </div>
+          <div class="jogo-item-actions">
+             <button onclick='gerarGraficoJogo(${JSON.stringify(jogo).replace(/'/g, "&apos;")})' class="btn-mini-graphic" style="background: rgba(124, 58, 237, 0.1); color: var(--purple-light); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;">
+               🎨 Gráfico
+             </button>
+          </div>
+        </div>
+        <div class="jogo-match-display" style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+          <div class="team home" style="display: flex; align-items: center; gap: 12px; flex: 1;">
+            <div class="team-shield" style="width: 36px; height: 36px; background: var(--card); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--purple-light); border: 1px solid var(--border); flex-shrink: 0;">${jogo.homeTeam.substring(0, 1).toUpperCase()}</div>
+            <span class="team-name" style="font-weight: 700; font-size: 0.95rem;">${jogo.homeTeam}</span>
+          </div>
+          <div class="match-vs" style="font-weight: 800; color: var(--text-muted); font-size: 0.7rem; padding: 0 10px;">VS</div>
+          <div class="team away" style="display: flex; align-items: center; gap: 12px; flex: 1; justify-content: flex-end;">
+            <span class="team-name" style="font-weight: 700; font-size: 0.95rem; text-align: right;">${jogo.awayTeam}</span>
+            <div class="team-shield" style="width: 36px; height: 36px; background: var(--card); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--purple-light); border: 1px solid var(--border); flex-shrink: 0;">${jogo.awayTeam.substring(0, 1).toUpperCase()}</div>
           </div>
         </div>
       </div>
@@ -2831,9 +2842,13 @@ function renderJogos(jogos, dia) {
   // Adiciona nota de atualização
   const dataAtualizacao = new Date();
   html += `
-    <div class="jogo-refresh" style="margin-top: 20px; text-align: center; font-size: 0.85rem; color: var(--text-muted);">
-      <p>📅 Atualizado em ${dataAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-      <p style="margin-top: 4px;">Fonte: <a href="https://www.futebolnatv.com.br" target="_blank" style="color: var(--purple-light);">Futebol na TV</a></p>
+    <div class="jogo-refresh-info" style="margin-top: 32px; padding-top: 20px; border-top: 1px dashed var(--border); text-align: center;">
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
+        Última atualização: <b>${dataAtualizacao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>
+      </div>
+      <p style="font-size: 0.75rem; color: var(--text-muted);">
+        Dados capturados de <a href="https://www.futebolnatv.com.br" target="_blank" style="color: var(--purple-light); text-decoration: underline;">Futebol na TV</a>
+      </p>
     </div>
   `;
 
@@ -2853,18 +2868,28 @@ async function copiarJogos(dia) {
   if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
   const dataFormatada = hoje.toLocaleDateString('pt-BR');
 
-  let texto = `⚽ JOGOS DO DIA - ${dataFormatada}\n\n`;
-  jogos.forEach((jogo, index) => {
-    texto += `${index + 1}. ${jogo.time} - ${jogo.competition}\n`;
-    texto += `   ${jogo.homeTeam} x ${jogo.awayTeam}\n`;
-    texto += `   📺 ${jogo.channel}\n\n`;
+  let texto = `*⚽ JOGOS DO DIA - ${dataFormatada}*\n\n`;
+  
+  // Agrupa por competição
+  const porCompete = {};
+  jogos.forEach(j => {
+    if (!porCompete[j.competition]) porCompete[j.competition] = [];
+    porCompete[j.competition].push(j);
   });
 
-  texto += `Fonte: Futebol na TV`;
+  for (const comp in porCompete) {
+    texto += `*🏆 ${comp.toUpperCase()}*\n`;
+    porCompete[comp].forEach(jogo => {
+      texto += `⏰ ${jogo.time} | ${jogo.homeTeam} x ${jogo.awayTeam}\n`;
+      texto += `📺 Onde assistir: ${jogo.channel}\n\n`;
+    });
+  }
+
+  texto += `_Enviado via Gestor Flex_`;
 
   try {
     await navigator.clipboard.writeText(texto);
-    toast('Jogos copiados com sucesso!', 'success');
+    toast('Jogos copiados para o WhatsApp!', 'success');
   } catch (err) {
     console.error('Erro ao copiar:', err);
     toast('Erro ao copiar. Tente manualmente.', 'error');
@@ -2878,96 +2903,185 @@ async function gerarImagemJogos(dia) {
     return;
   }
 
+  toast('Gerando agenda de jogos...', 'info');
+
   const hoje = new Date();
   if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
   if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
   const dataFormatada = hoje.toLocaleDateString('pt-BR');
 
-  // Cria um canvas para gerar a imagem
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   
-  // Configurações
-  const padding = 30;
-  const itemHeight = 70;
-  const headerHeight = 80;
-  const width = 800;
-  const height = headerHeight + (jogos.length * itemHeight) + 100;
-  
+  const width = 1080;
+  const height = 1920;
   canvas.width = width;
   canvas.height = height;
 
-  // Fundo gradiente
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  // 1. Fundo Premium
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, '#0D0A1A');
+  gradient.addColorStop(0.5, '#1E1838');
+  gradient.addColorStop(1, '#0D0A1A');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  // Efeito de brilho
+  const radial = ctx.createRadialGradient(width/2, 0, 100, width/2, 0, 800);
+  radial.addColorStop(0, 'rgba(124, 58, 237, 0.3)');
+  radial.addColorStop(1, 'transparent');
+  ctx.fillStyle = radial;
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Header
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 80px Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('AGENDA DE JOGOS', width / 2, 180);
+  
+  ctx.fillStyle = '#A78BFA';
+  ctx.font = 'bold 45px Inter, sans-serif';
+  ctx.fillText(dataFormatada.toUpperCase(), width / 2, 250);
+
+  ctx.strokeStyle = 'rgba(167, 139, 250, 0.3)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(200, 300);
+  ctx.lineTo(880, 300);
+  ctx.stroke();
+
+  // 3. Lista de jogos
+  const maxJogos = 10;
+  const jogosParaMostrar = jogos.slice(0, maxJogos);
+  let yPos = 380;
+  const itemHeight = 140;
+
+  jogosParaMostrar.forEach((jogo) => {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.fillRect(80, yPos - 30, width - 160, itemHeight - 20);
+    
+    if (jogo.isDestaque) {
+      ctx.strokeStyle = '#7C3AED';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(80, yPos - 30, width - 160, itemHeight - 20);
+    }
+
+    ctx.fillStyle = '#7C3AED';
+    ctx.font = 'bold 38px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(jogo.time, 120, yPos + 45);
+
+    ctx.fillStyle = '#9B93C5';
+    ctx.font = '30px Inter, sans-serif';
+    let comp = jogo.competition;
+    if (comp.length > 30) comp = comp.substring(0, 27) + '...';
+    ctx.fillText(comp, 260, yPos + 15);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 36px Inter, sans-serif';
+    ctx.fillText(`${jogo.homeTeam} x ${jogo.awayTeam}`, 260, yPos + 65);
+
+    ctx.fillStyle = '#34d399';
+    ctx.font = 'bold 28px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`📺 ${jogo.channel}`, width - 120, yPos + 45);
+
+    yPos += itemHeight;
+  });
+
+  if (jogos.length > maxJogos) {
+    ctx.fillStyle = '#9B93C5';
+    ctx.font = 'italic 28px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`+ ${jogos.length - maxJogos} jogos disponíveis no app`, width / 2, yPos + 40);
+  }
+
+  // 4. Rodapé
+  ctx.fillStyle = 'rgba(124, 58, 237, 0.2)';
+  ctx.fillRect(0, height - 150, width, 150);
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 40px Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('GESTOR FLEX', width / 2, height - 80);
+  
+  ctx.fillStyle = '#A78BFA';
+  ctx.font = '24px Inter, sans-serif';
+  ctx.fillText('GESTAO COMPLETA IPTV', width / 2, height - 40);
+
+  downloadCanvas(canvas, `agenda-jogos-${dia}`);
+}
+
+async function gerarGraficoJogo(jogo) {
+  toast(`Gerando gráfico para ${jogo.homeTeam} x ${jogo.awayTeam}...`, 'info');
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  const width = 1080;
+  const height = 1080;
+  canvas.width = width;
+  canvas.height = height;
+
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, '#0D0A1A');
   gradient.addColorStop(1, '#1E1838');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
-  // Título
   ctx.fillStyle = '#A78BFA';
-  ctx.font = 'bold 28px Syne, sans-serif';
+  ctx.font = 'bold 40px Inter, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`⚽ JOGOS DO DIA - ${dataFormatada}`, width / 2, 50);
+  ctx.fillText(jogo.competition.toUpperCase(), width / 2, 150);
 
-  // Lista de jogos
-  let yPos = headerHeight;
-  jogos.forEach((jogo, index) => {
-    const isDestaque = jogo.isDestaque;
-    
-    // Fundo do item
-    ctx.fillStyle = isDestaque ? 'rgba(124, 58, 237, 0.15)' : 'rgba(255, 255, 255, 0.05)';
-    ctx.fillRect(padding + 10, yPos + 10, width - (padding * 2) - 20, itemHeight - 20);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 80px Syne, sans-serif';
+  ctx.fillText(jogo.homeTeam.toUpperCase(), width / 2, 380);
+  
+  ctx.fillStyle = 'rgba(167, 139, 250, 0.5)';
+  ctx.font = 'bold 60px Syne, sans-serif';
+  ctx.fillText('VS', width / 2, 480);
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 80px Syne, sans-serif';
+  ctx.fillText(jogo.awayTeam.toUpperCase(), width / 2, 580);
 
-    // Horário
-    ctx.fillStyle = '#7C3AED';
-    ctx.font = 'bold 16px Inter, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`🕗 ${jogo.time}`, padding + 20, yPos + 30);
+  ctx.fillStyle = '#7C3AED';
+  ctx.fillRect(width/2 - 150, 680, 300, 80);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 50px Inter, sans-serif';
+  ctx.fillText(jogo.time, width / 2, 740);
 
-    // Campeonato
-    ctx.fillStyle = '#9B93C5';
-    ctx.font = '14px Inter, sans-serif';
-    ctx.fillText(jogo.competition, padding + 100, yPos + 30);
-
-    // Times
-    ctx.fillStyle = isDestaque ? '#A78BFA' : '#E2E0F0';
-    ctx.font = 'bold 16px Inter, sans-serif';
-    ctx.fillText(`${jogo.homeTeam}`, padding + 20, yPos + 55);
-    
-    ctx.fillStyle = '#9B93C5';
-    ctx.font = '14px Inter, sans-serif';
-    ctx.fillText('x', padding + 220, yPos + 55);
-    
-    ctx.fillStyle = isDestaque ? '#A78BFA' : '#E2E0F0';
-    ctx.fillText(`${jogo.awayTeam}`, padding + 240, yPos + 55);
-
-    // Canal
-    ctx.fillStyle = '#34d399';
-    ctx.font = '14px Inter, sans-serif';
-    ctx.fillText(`📺 ${jogo.channel}`, width - padding - 120, yPos + 55);
-
-    yPos += itemHeight;
-  });
-
-  // Rodapé
   ctx.fillStyle = '#9B93C5';
-  ctx.font = '12px Inter, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`Fonte: Futebol na TV • Atualizado em ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, width / 2, height - 20);
+  ctx.font = 'bold 30px Inter, sans-serif';
+  ctx.fillText('ONDE ASSISTIR:', width / 2, 850);
+  
+  ctx.fillStyle = '#34d399';
+  ctx.font = 'bold 60px Inter, sans-serif';
+  ctx.fillText(`📺 ${jogo.channel}`, width / 2, 930);
 
-  // Baixa a imagem
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.font = 'bold 30px Syne, sans-serif';
+  ctx.fillText('GESTOR FLEX', width / 2, height - 50);
+
+  downloadCanvas(canvas, `jogo-${jogo.homeTeam}-vs-${jogo.awayTeam}`);
+}
+
+function downloadCanvas(canvas, filename) {
   try {
     const link = document.createElement('a');
-    link.download = `jogos-${dia}-${hoje.toISOString().slice(0, 10)}.png`;
+    link.download = `${filename}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
     toast('Imagem gerada com sucesso!', 'success');
   } catch (err) {
-    console.error('Erro ao gerar imagem:', err);
+    console.error('Erro ao baixar imagem:', err);
     toast('Erro ao gerar imagem', 'error');
   }
 }
+
+window.gerarGraficoJogo = gerarGraficoJogo;
+
 
 // Adiciona event listeners para jogos
 document.addEventListener('DOMContentLoaded', () => {
