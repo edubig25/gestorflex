@@ -103,24 +103,24 @@ async function boot() {
       return;
     }
 
-    // Se existe sessão no Supabase Auth
-    if (session && session.user) {
-      const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', session.user.id).single();
-      if (customUser) {
-        currentUser = { ...session.user, ...customUser };
+// Se existe sessão no Supabase Auth
+  if (session && session.user) {
+    const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', session.user.id).single();
+    if (customUser) {
+      currentUser = { ...session.user, ...customUser };
 
-        if (currentUser.two_factor_enabled) {
-          tempLoginUser = currentUser;
-          hide('login-screen');
-          show('twofa-screen');
-          $('twofa-code').focus();
-        } else {
-          hide('login-screen');
-          enterApp();
-        }
-        return;
+      if (currentUser.two_factor_enabled) {
+        tempLoginUser = currentUser;
+        hide('login-screen');
+        show('twofa-screen');
+        $('twofa-code').focus();
+      } else {
+        hide('login-screen');
+        await enterApp();
       }
+      return;
     }
+  }
 
     show('login-screen');
   } catch (err) {
@@ -390,11 +390,11 @@ $('back-login').addEventListener('click', async e => {
   show('login-screen');
 });
 
-function finishLogin(user) {
+async function finishLogin(user) {
   currentUser = user;
   hide('login-screen');
   hide('twofa-screen');
-  enterApp();
+  await enterApp();
 }
 
 // === FORGOT PASSWORD (SUPABASE NATIVO) ===
@@ -487,7 +487,7 @@ $('form-reset').addEventListener('submit', async e => {
 });
 
 // === ENTER APP ===
-function enterApp() {
+async function enterApp() {
   try {
     console.log('Entering App Layout...');
     hide('login-screen');
@@ -499,6 +499,8 @@ function enterApp() {
     loadPlanos();
     loadDashboard();
     populateConfig();
+    // Carrega configs do Meta Ads em segundo plano
+    loadMetaConfig();
     // MAC/KEY toggle
     document.querySelectorAll('input[name="cl-has-mac"]').forEach(r => {
       r.addEventListener('change', () => {
@@ -1766,52 +1768,123 @@ function filterWaHistoryTable() {
 let metaConfigData = null;
 
 async function loadMetaAds() {
-  await loadMetaConfig();
-  if (metaConfigData && metaConfigData.access_token && metaConfigData.ad_account_id) {
+  console.log('[Meta Ads] === INICIANDO LOAD META ADS ===');
+  const hasConfig = await loadMetaConfig();
+  
+  console.log('[Meta Ads] hasConfig:', hasConfig);
+  console.log('[Meta Ads] metaConfigData:', metaConfigData);
+  console.log('[Meta Ads] access_token:', metaConfigData?.access_token ? 'Presente' : 'Ausente');
+  console.log('[Meta Ads] ad_account_id:', metaConfigData?.ad_account_id ? 'Presente' : 'Ausente');
+  
+  // Verifica se os inputs existem
+  const tokenInput = $('meta-access-token');
+  const actInput = $('meta-ad-account');
+  
+  console.log('[Meta Ads] tokenInput:', tokenInput ? 'Encontrado' : 'Não encontrado');
+  console.log('[Meta Ads] actInput:', actInput ? 'Encontrado' : 'Não encontrado');
+  console.log('[Meta Ads] tokenInput.value:', tokenInput?.value ? 'Tem valor' : 'Vazio');
+  console.log('[Meta Ads] actInput.value:', actInput?.value ? 'Tem valor' : 'Vazio');
+  
+  if (hasConfig && metaConfigData && metaConfigData.access_token && metaConfigData.ad_account_id) {
+    console.log('[Meta Ads] Conectado:', metaConfigData.ad_account_id);
     $('meta-status-badge').textContent = 'Conectado';
     $('meta-status-badge').className = 'status-badge green';
     show('meta-dashboard');
     await fetchMetaMetrics();
     await fetchMetaCampaigns();
   } else {
+    console.log('[Meta Ads] Desconectado ou sem configuração');
     $('meta-status-badge').textContent = 'Desconectado';
     $('meta-status-badge').className = 'status-badge red';
     hide('meta-dashboard');
   }
+  console.log('[Meta Ads] === FIM LOAD META ADS ===');
 }
 
 async function loadMetaConfig() {
-  const { data, error } = await db.from('meta_config').select('*').limit(1);
-  if (!error && data && data.length > 0) {
-    metaConfigData = data[0];
-    $('meta-access-token').value = metaConfigData.access_token || '';
-    $('meta-ad-account').value = metaConfigData.ad_account_id || '';
-  } else if (error && error.code === '42P01') {
-    toast('Tabela meta_config não existe. Execute o SQL de configuração.', 'error');
+  try {
+    console.log('[Meta Ads] Carregando configuração...');
+    
+    if (!db) {
+      console.error('[Meta Ads] Supabase não inicializado');
+      return false;
+    }
+    
+    const { data, error } = await db.from('meta_config').select('*').limit(1);
+    
+    if (error) {
+      console.error('[Meta Ads] Erro no banco:', error);
+      if (error.code === '42P01' || (error.message && error.message.includes('does not exist'))) {
+        toast('Tabela meta_config não existe. Execute o SQL de configuração.', 'error');
+      }
+      return false;
+    }
+    
+    console.log('[Meta Ads] Dados brutos:', data);
+    
+    if (data && data.length > 0) {
+      console.log('[Meta Ads] Configuração encontrada:', data[0]);
+      metaConfigData = data[0];
+      const tokenInput = $('meta-access-token');
+      const actInput = $('meta-ad-account');
+      
+      if (tokenInput) {
+        tokenInput.value = metaConfigData.access_token || '';
+        console.log('[Meta Ads] Token preenchido:', metaConfigData.access_token ? 'Sim' : 'Vazio');
+      }
+      if (actInput) {
+        actInput.value = metaConfigData.ad_account_id || '';
+        console.log('[Meta Ads] Ad Account ID preenchido:', metaConfigData.ad_account_id ? 'Sim' : 'Vazio');
+      }
+      
+      return true;
+    }
+    
+    console.log('[Meta Ads] Nenhuma configuração encontrada');
+    return false;
+  } catch (e) {
+    console.error('[Meta Ads] Erro ao carregar meta_config:', e);
+    return false;
   }
 }
 
 $('btn-meta-connect')?.addEventListener('click', async () => {
+  console.log('Botão Meta Connect clicado');
   const token = $('meta-access-token').value.trim();
   let actId = $('meta-ad-account').value.trim();
+  
   if (!token || !actId) {
-    return toast('Preencha o Token e o Ad Account ID', 'error');
+    toast('Preencha o Token e o Ad Account ID', 'error');
+    return;
   }
+  
   if (!actId.startsWith('act_')) {
     actId = 'act_' + actId;
     $('meta-ad-account').value = actId;
   }
 
+  console.log('Salvando configuração Meta:', { access_token: token.substring(0, 20) + '...', ad_account_id: actId });
+  
   const payload = { access_token: token, ad_account_id: actId };
+  let error, data;
+  
   if (metaConfigData && metaConfigData.id) {
-    await db.from('meta_config').update(payload).eq('id', metaConfigData.id);
+    console.log('Atualizando configuração existente, ID:', metaConfigData.id);
+    ({ error } = await db.from('meta_config').update(payload).eq('id', metaConfigData.id));
   } else {
-    const { data } = await db.from('meta_config').insert(payload).select();
+    console.log('Inserindo nova configuração');
+    ({ data, error } = await db.from('meta_config').insert(payload).select());
     if (data && data.length > 0) metaConfigData = data[0];
   }
   
+  if (error) {
+    console.error('Erro ao salvar Meta config:', error);
+    toast('Erro ao salvar: ' + error.message, 'error');
+    return;
+  }
+
   toast('Configuração Meta salva!', 'success');
-  loadMetaAds();
+  await loadMetaAds();
 });
 
 async function apiMeta(endpoint, method = 'GET', params = {}) {
