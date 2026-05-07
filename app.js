@@ -2601,47 +2601,79 @@ async function atualizarJogosEmSegundoPlano(dia) {
 }
 
 async function fetchJogosAPI(dia) {
-  console.log('[Jogos] Buscando dados da API para:', dia);
-  
-  const timeout = 15000; // 15 segundos de timeout
-  
-  try {
-    // Tenta buscar via proxy CORS para contornar restrições
-    const corsProxies = [
-      'https://api.allorigins.win/raw?url=',
-      'https://corsproxy.io/?'
-    ];
+  console.log('[Jogos] Buscando dados reais da API para:', dia);
 
-    for (const proxy of corsProxies) {
-      try {
-        const url = proxy + encodeURIComponent('https://www.futebolnatv.com.br');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-        
-        const response = await fetch(url, { 
-          signal: controller.signal,
-          headers: { 'Accept': 'text/html' }
-        });
-        clearTimeout(timeoutId);
+  const timeout = 15000; // 15 s timeout
+  const dateMap = {
+    ontem: () => new Date(Date.now() - 86400000),
+    hoje: () => new Date(),
+    amanha: () => new Date(Date.now() + 86400000)
+  };
 
-        if (response.ok) {
-          const html = await response.text();
-          const jogos = parseFutebolNaTV(html, dia);
-          if (jogos && jogos.length > 0) {
-            console.log('[Jogos] Dados obtidos via proxy:', jogos.length, 'jogos');
-            return jogos;
-          }
-        }
-      } catch (err) {
-        console.log('[Jogos] Proxy falhou, tentando próximo:', err.message);
+  const dateObj = dateMap[dia] ? dateMap[dia]() : new Date();
+  const dateStr = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  const apiUrl = `https://www.thesportsdb.com/api/v1/json/1/eventsday.php?d=${dateStr}&l=Portuguese%20League`;
+
+  const corsProxies = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?'
+  ];
+
+  for (const proxy of corsProxies) {
+    try {
+      const url = proxy + encodeURIComponent(apiUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.log('[Jogos] Proxy resposta não OK, tentando próximo');
         continue;
       }
+
+      const data = await response.json();
+      if (!data.events || data.events.length === 0) {
+        console.log('[Jogos] Nenhum evento retornado, tentando próximo proxy');
+        continue;
+      }
+
+      // Converter para o formato usado pela aplicação
+      const jogos = data.events.map(ev => {
+        const time = ev.strTime || '00:00';
+        const competition = ev.strLeague || 'Campeonato';
+        const channel = ev.strTVStation || 'TV Aberta';
+        let homeTeam = '';
+        let awayTeam = '';
+        const sep = ev.strEvent?.includes(' x ') ? ' x ' : ev.strEvent?.includes(' vs ') ? ' vs ' : ' - ';
+        if (ev.strEvent && sep) {
+          const parts = ev.strEvent.split(sep);
+          homeTeam = parts[0]?.trim() || '';
+          awayTeam = parts[1]?.trim() || '';
+        }
+        return {
+          time,
+          competition,
+          homeTeam,
+          awayTeam,
+          channel,
+          isDestaque: /Liga|Campeonato/i.test(competition)
+        };
+      }).filter(j => j.homeTeam && j.awayTeam);
+
+      if (jogos.length > 0) {
+        console.log('[Jogos] Dados reais obtidos via proxy:', jogos.length, 'jogos');
+        return jogos;
+      }
+    } catch (err) {
+      console.log('[Jogos] Falha ao obter dados via proxy:', err.message);
+      continue;
     }
-  } catch (err) {
-    console.error('[Jogos] Erro na fetch:', err.message);
   }
 
-  // Se todos os proxies falharem, usa dados simulados
+  // Fallback para dados simulados se tudo falhar
   console.log('[Jogos] Usando dados simulados (todos proxies falharam)');
   return getJogosSimulados(dia);
 }
