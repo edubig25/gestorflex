@@ -531,15 +531,15 @@
 <div id="page-meta-ads" class="page">
   <div class="page-header">
     <div style="display: flex; align-items: center; gap: 15px;">
-      <h1>Meta Ads</h1>
+      <h1>🎯 Meta Ads Manager</h1>
       <div class="status-badge red" id="meta-status-badge">Desconectado</div>
     </div>
-    <p>Integração com API de Marketing do Meta</p>
+    <p>Gerencie suas campanhas e métricas do Meta Ads</p>
   </div>
 
   <div class="dash-grid wa-main-grid">
   <!-- CONEXÃO -->
-  <div class="card">
+  <div class="card" id="meta-connection-card">
     <div class="card-header"><h3>⚙️ Conexão Meta Ads</h3></div>
     <div class="auth-form" style="max-width: 600px;">
       <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:15px;line-height:1.6">
@@ -557,36 +557,184 @@
       </div>
       <div style="display:flex; gap:10px; margin-top: 10px;">
         <button class="btn-primary" id="btn-meta-connect" style="background: #0668E1; color: #fff; box-shadow: 0 4px 24px rgba(6,104,225,0.3);">Conectar / Salvar</button>
+        <button class="btn-secondary" id="btn-meta-disconnect" style="background: #EF4444; color: #fff;">Desconectar</button>
       </div>
     </div>
   </div>
 
-        <!-- DASHBOARD (Só visível quando conectado) -->
-        <div id="meta-dashboard" class="hidden">
-           <div class="metrics-grid" style="margin-bottom:20px;">
-              <div class="metric-card purple"><div class="metric-icon">💸</div><div class="metric-info"><span class="metric-label">Gasto (Hoje)</span><span class="metric-value" id="meta-spend-hoje">R$ 0,00</span></div></div>
-              <div class="metric-card yellow"><div class="metric-icon">💰</div><div class="metric-info"><span class="metric-label">Gasto (Mês)</span><span class="metric-value" id="meta-spend-mes">R$ 0,00</span></div></div>
-              <div class="metric-card green"><div class="metric-icon">🎯</div><div class="metric-info"><span class="metric-label">Custo por Lead (Mês)</span><span class="metric-value" id="meta-cpl">R$ 0,00</span></div></div>
-              <div class="metric-card"><div class="metric-icon">🖱️</div><div class="metric-info"><span class="metric-label">Cliques (Mês)</span><span class="metric-value" id="meta-cliques">0</span></div></div>
-           </div>
-
-           <div class="card">
-              <div class="card-header">
-                  <h3>📢 Campanhas Ativas/Pausadas</h3>
-                  <button class="btn-primary" id="btn-meta-nova-campanha" style="background: #0668E1; padding: 6px 12px; font-size: 0.85rem;">+ Nova Campanha</button>
-              </div>
-              <div class="table-wrap">
-                <table class="data-table">
-                  <thead><tr><th>Status</th><th>Campanha</th><th>Objetivo</th><th>Orçamento Diário</th><th>Gasto</th><th>Resultados</th><th>Ações</th></tr></thead>
-                  <tbody id="tbody-meta-campanhas"></tbody>
-                </table>
-                <div id="meta-campanhas-empty" class="empty-state hidden">Nenhuma campanha encontrada.</div>
-              </div>
-           </div>
+  <!-- DASHBOARD PRINCIPAL (Só visível quando conectado) -->
+  <div id="meta-dashboard" class="hidden">
+    
+    <!-- FILTROS DE PERÍODO -->
+    <div class="card" style="margin-bottom: 20px;">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>📊 Visão Geral</h3>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <select id="meta-period" class="filter-select" style="width:auto;">
+            <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="last_7d" selected>Últimos 7 dias</option>
+            <option value="last_30d">Últimos 30 dias</option>
+            <option value="this_month">Este mês</option>
+            <option value="last_month">Mês passado</option>
+            <option value="lifetime">Desde o início</option>
+          </select>
+          <button class="btn-primary" id="btn-meta-refresh" style="background: #0668E1; padding: 6px 12px; font-size: 0.85rem;">🔄 Atualizar</button>
         </div>
-
       </div>
     </div>
+
+    <!-- MÉTRICAS PRINCIPAIS -->
+    <div class="metrics-grid" style="margin-bottom:20px;">
+      <div class="metric-card purple">
+        <div class="metric-icon">💸</div>
+        <div class="metric-info">
+          <span class="metric-label">Gasto Total</span>
+          <span class="metric-value" id="meta-spend">R$ 0,00</span>
+          <span class="metric-sub" id="meta-spend-var">--</span>
+        </div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-icon">🎯</div>
+        <div class="metric-info">
+          <span class="metric-label">Custo por Lead</span>
+          <span class="metric-value" id="meta-cpl">R$ 0,00</span>
+          <span class="metric-sub" id="meta-cpl-var">--</span>
+        </div>
+      </div>
+      <div class="metric-card yellow">
+        <div class="metric-icon">🖱️</div>
+        <div class="metric-info">
+          <span class="metric-label">Cliques</span>
+          <span class="metric-value" id="meta-cliques">0</span>
+          <span class="metric-sub" id="meta-cliques-var">--</span>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">👁️</div>
+        <div class="metric-info">
+          <span class="metric-label">Impressões</span>
+          <span class="metric-value" id="meta-impressoes">0</span>
+          <span class="metric-sub" id="meta-impressoes-var">--</span>
+        </div>
+      </div>
+      <div class="metric-card purple">
+        <div class="metric-icon">📲</div>
+        <div class="metric-info">
+          <span class="metric-label">Leads</span>
+          <span class="metric-value" id="meta-leads">0</span>
+          <span class="metric-sub" id="meta-leads-var">--</span>
+        </div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-icon">💰</div>
+        <div class="metric-info">
+          <span class="metric-label">CTR</span>
+          <span class="metric-value" id="meta-ctr">0%</span>
+          <span class="metric-sub" id="meta-ctr-var">--</span>
+        </div>
+      </div>
+      <div class="metric-card yellow">
+        <div class="metric-icon">📈</div>
+        <div class="metric-info">
+          <span class="metric-label">Campanhas Ativas</span>
+          <span class="metric-value" id="meta-campanhas-ativas">0</span>
+          <span class="metric-sub" id="meta-campanhas-var">--</span>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">💵</div>
+        <div class="metric-info">
+          <span class="metric-label">Custo por Clique</span>
+          <span class="metric-value" id="meta-cpc">R$ 0,00</span>
+          <span class="metric-sub" id="meta-cpc-var">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div class="dash-grid" style="grid-template-columns: 1.5fr 1fr; margin-bottom: 20px;">
+      <!-- Evolução dos Gastos -->
+      <div class="card chart-card">
+        <div class="card-header">
+          <h3>📈 Evolução dos Gastos</h3>
+        </div>
+        <canvas id="meta-chart-gastos" height="220"></canvas>
+      </div>
+      
+      <!-- Distribuição por Campanha -->
+      <div class="card chart-card">
+        <div class="card-header">
+          <h3>📊 Gastos por Campanha</h3>
+        </div>
+        <canvas id="meta-chart-campanhas" height="220"></canvas>
+      </div>
+    </div>
+
+    <!-- TABELA DE CAMPANHAS -->
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>📢 Campanhas</h3>
+        <div style="display:flex;gap:10px;">
+          <select id="meta-filter-status" class="filter-select" style="width:auto;">
+            <option value="all">Todas</option>
+            <option value="ACTIVE">Ativas</option>
+            <option value="PAUSED">Pausadas</option>
+            <option value="DELETED">Excluídas</option>
+          </select>
+          <button class="btn-primary" id="btn-meta-nova-campanha" style="background: #0668E1; padding: 6px 12px; font-size: 0.85rem;">+ Nova Campanha</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Campanha</th>
+              <th>Objetivo</th>
+              <th>Orçamento</th>
+              <th>Gasto</th>
+              <th>Impressões</th>
+              <th>Cliques</th>
+              <th>Leads</th>
+              <th>CTR</th>
+              <th>CPL</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-meta-campanhas"></tbody>
+        </table>
+        <div id="meta-campanhas-empty" class="empty-state hidden">Nenhuma campanha encontrada.</div>
+      </div>
+    </div>
+
+    <!-- CONJUNTOS DE ANÚNCIOS -->
+    <div class="card" style="margin-top: 20px;">
+      <div class="card-header">
+        <h3>📰 Conjuntos de Anúncios</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Conjunto</th>
+              <th>Campanha</th>
+              <th>Status</th>
+              <th>Gasto</th>
+              <th>Cliques</th>
+              <th>Leads</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-meta-conjuntos"></tbody>
+        </table>
+        <div id="meta-conjuntos-empty" class="empty-state hidden">Nenhum conjunto encontrado.</div>
+      </div>
+    </div>
+
+  </div>
+  </div>
+</div>
 
   </main>
 </div>

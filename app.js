@@ -537,8 +537,13 @@ document.querySelectorAll('.nav-item').forEach(item => {
 });
 
 function navigateTo(page) {
+  console.log('[Navigation] Indo para:', page);
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
-  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+  document.querySelectorAll('.page').forEach(p => {
+    const isActive = p.id === 'page-' + page;
+    if (isActive) console.log('[Navigation] Mostrando página:', p.id);
+    p.classList.toggle('active', isActive);
+  });
   const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', whatsapp: 'WhatsApp', configuracoes: 'Configurações', 'meta-ads': 'Meta Ads' };
   $('topbar-title').textContent = titles[page] || '';
   if (page === 'clientes') loadClientes();
@@ -1769,6 +1774,8 @@ let metaConfigData = null;
 
 async function loadMetaAds() {
   console.log('[Meta Ads] === INICIANDO LOAD META ADS ===');
+  
+  // Sempre carrega as configurações salvas
   const hasConfig = await loadMetaConfig();
   
   console.log('[Meta Ads] hasConfig:', hasConfig);
@@ -1785,19 +1792,26 @@ async function loadMetaAds() {
   console.log('[Meta Ads] tokenInput.value:', tokenInput?.value ? 'Tem valor' : 'Vazio');
   console.log('[Meta Ads] actInput.value:', actInput?.value ? 'Tem valor' : 'Vazio');
   
+  // Atualiza o status badge e mostra o dashboard
   if (hasConfig && metaConfigData && metaConfigData.access_token && metaConfigData.ad_account_id) {
     console.log('[Meta Ads] Conectado:', metaConfigData.ad_account_id);
     $('meta-status-badge').textContent = 'Conectado';
     $('meta-status-badge').className = 'status-badge green';
+    hide('meta-connection-card');
     show('meta-dashboard');
+    
+    // Busca as métricas, campanhas e conjuntos
     await fetchMetaMetrics();
     await fetchMetaCampaigns();
+    await fetchMetaAdSets();
   } else {
     console.log('[Meta Ads] Desconectado ou sem configuração');
     $('meta-status-badge').textContent = 'Desconectado';
     $('meta-status-badge').className = 'status-badge red';
+    show('meta-connection-card');
     hide('meta-dashboard');
   }
+  
   console.log('[Meta Ads] === FIM LOAD META ADS ===');
 }
 
@@ -1830,17 +1844,22 @@ async function loadMetaConfig() {
       
       if (tokenInput) {
         tokenInput.value = metaConfigData.access_token || '';
-        console.log('[Meta Ads] Token preenchido:', metaConfigData.access_token ? 'Sim' : 'Vazio');
+        console.log('[Meta Ads] Token preenchido:', metaConfigData.access_token ? 'Sim (preenchido automaticamente)' : 'Vazio');
+      } else {
+        console.warn('[Meta Ads] Input meta-access-token não encontrado no DOM');
       }
+      
       if (actInput) {
         actInput.value = metaConfigData.ad_account_id || '';
-        console.log('[Meta Ads] Ad Account ID preenchido:', metaConfigData.ad_account_id ? 'Sim' : 'Vazio');
+        console.log('[Meta Ads] Ad Account ID preenchido:', metaConfigData.ad_account_id ? 'Sim (preenchido automaticamente)' : 'Vazio');
+      } else {
+        console.warn('[Meta Ads] Input meta-ad-account não encontrado no DOM');
       }
       
       return true;
     }
     
-    console.log('[Meta Ads] Nenhuma configuração encontrada');
+    console.log('[Meta Ads] Nenhuma configuração encontrada (tabela vazia)');
     return false;
   } catch (e) {
     console.error('[Meta Ads] Erro ao carregar meta_config:', e);
@@ -1923,34 +1942,63 @@ async function apiMeta(endpoint, method = 'GET', params = {}) {
   }
 }
 
+// Variáveis globais para gráficos do Meta Ads
+let metaChartGastos = null;
+let metaChartCampanhas = null;
+
 async function fetchMetaMetrics() {
   if (!metaConfigData) return;
-  const actId = metaConfigData.ad_account_id;
   
-  // Gastos Hoje
-  const resHoje = await apiMeta(`/${actId}/insights`, 'GET', { date_preset: 'today', fields: 'spend' });
-  let spendHoje = 0;
-  if (resHoje && resHoje.data && resHoje.data.length > 0) spendHoje = parseFloat(resHoje.data[0].spend);
-  $('meta-spend-hoje').textContent = fmt(spendHoje);
-
-  // Métricas do Mês
-  const resMes = await apiMeta(`/${actId}/insights`, 'GET', { date_preset: 'this_month', fields: 'spend,clicks,impressions,cpc,cpm,actions' });
-  if (resMes && resMes.data && resMes.data.length > 0) {
-    const d = resMes.data[0];
-    $('meta-spend-mes').textContent = fmt(d.spend);
-    $('meta-cliques').textContent = d.clicks || 0;
+  const actId = metaConfigData.ad_account_id;
+  const period = $('meta-period')?.value || 'last_7d';
+  
+  console.log('[Meta Ads] Buscando métricas para:', period);
+  
+  // Busca todas as métricas de uma vez
+  const fields = 'spend,clicks,impressions,cpc,cpm,ctr,frequency,actions,reach';
+  const res = await apiMeta(`/${actId}/insights`, 'GET', { 
+    date_preset: period,
+    fields: fields 
+  });
+  
+  if (res && res.data && res.data.length > 0) {
+    const d = res.data[0];
     
-    // CPL Aproximado (procurar leads nas actions)
+    // Preenche todas as métricas
+    $('meta-spend').textContent = fmt(d.spend || 0);
+    $('meta-cliques').textContent = (d.clicks || 0).toLocaleString('pt-BR');
+    $('meta-impressoes').textContent = (d.impressions || 0).toLocaleString('pt-BR');
+    $('meta-cpc').textContent = fmt(d.cpc || 0);
+    
+    // CTR
+    const ctr = d.ctr ? (d.ctr * 100).toFixed(2) : 0;
+    $('meta-ctr').textContent = ctr + '%';
+    
+    // Leads
     let leads = 0;
     if (d.actions) {
       const leadAction = d.actions.find(a => a.action_type === 'lead');
-      if (leadAction) leads = parseInt(leadAction.value);
+      if (leadAction) leads = parseInt(leadAction.value) || 0;
     }
-    const cpl = leads > 0 ? parseFloat(d.spend) / leads : 0;
+    $('meta-leads').textContent = leads.toLocaleString('pt-BR');
+    
+    // CPL
+    const cpl = leads > 0 ? (parseFloat(d.spend || 0) / leads) : 0;
     $('meta-cpl').textContent = fmt(cpl);
+    
+    // Campanhas ativas
+    await fetchMetaCampaigns();
+    
+    // Atualiza gráficos
+    await updateMetaCharts(period);
   } else {
-    $('meta-spend-mes').textContent = fmt(0);
-    $('meta-cliques').textContent = 0;
+    // Zera métricas se não houver dados
+    $('meta-spend').textContent = fmt(0);
+    $('meta-cliques').textContent = '0';
+    $('meta-impressoes').textContent = '0';
+    $('meta-cpc').textContent = fmt(0);
+    $('meta-ctr').textContent = '0%';
+    $('meta-leads').textContent = '0';
     $('meta-cpl').textContent = fmt(0);
   }
 }
@@ -1958,57 +2006,109 @@ async function fetchMetaMetrics() {
 async function fetchMetaCampaigns() {
   if (!metaConfigData) return;
   const actId = metaConfigData.ad_account_id;
-  const res = await apiMeta(`/${actId}/campaigns`, 'GET', { fields: 'id,name,status,objective,daily_budget,insights{spend,clicks,actions}' });
+  const filterStatus = $('meta-filter-status')?.value || 'all';
   
+  console.log('[Meta Ads] Buscando campanhas...');
+  
+  const res = await apiMeta(`/${actId}/campaigns`, 'GET', { 
+    fields: 'id,name,status,objective,daily_budget,lifetime_budget,insights{spend,clicks,impressions,actions,reach,frequency,ctr}' 
+  });
+
   const tbody = $('tbody-meta-campanhas');
+  
   if (!res || !res.data || res.data.length === 0) {
+    tbody.innerHTML = '';
+    show('meta-campanhas-empty');
+    $('meta-campanhas-ativas').textContent = '0';
+    return;
+  }
+  
+  // Filtra por status se necessário
+  let campaigns = res.data;
+  if (filterStatus !== 'all') {
+    campaigns = campaigns.filter(c => c.status === filterStatus.toUpperCase());
+  }
+  
+  // Conta campanhas ativas
+  const activeCount = res.data.filter(c => c.status === 'ACTIVE').length;
+  $('meta-campanhas-ativas').textContent = activeCount;
+  
+  if (campaigns.length === 0) {
     tbody.innerHTML = '';
     show('meta-campanhas-empty');
     return;
   }
+  
   hide('meta-campanhas-empty');
 
-  tbody.innerHTML = res.data.map(c => {
-    let spend = 0, results = 0;
+  tbody.innerHTML = campaigns.map(c => {
+    let spend = 0, clicks = 0, impressions = 0, leads = 0, ctr = 0;
+    
     if (c.insights && c.insights.data && c.insights.data.length > 0) {
-      spend = c.insights.data[0].spend || 0;
-      if (c.insights.data[0].actions) {
-        const resAction = c.insights.data[0].actions.find(a => ['lead', 'link_click', 'post_engagement'].includes(a.action_type));
-        if (resAction) results = resAction.value;
+      const insights = c.insights.data[0];
+      spend = insights.spend || 0;
+      clicks = insights.clicks || 0;
+      impressions = insights.impressions || 0;
+      ctr = insights.ctr ? (insights.ctr * 100) : 0;
+      
+      if (insights.actions) {
+        const leadAction = insights.actions.find(a => a.action_type === 'lead');
+        if (leadAction) leads = parseInt(leadAction.value) || 0;
       }
     }
     
-    const budget = c.daily_budget ? fmt(c.daily_budget / 100) : 'Vitalício';
-    
+    const budget = c.daily_budget ? fmt(c.daily_budget / 100) : (c.lifetime_budget ? fmt(c.lifetime_budget / 100) : '—');
+    const cpl = leads > 0 ? (spend / leads) : 0;
+
     // Status Badge
     let bClass = 'badge-pendente';
     let bTxt = c.status;
     if (c.status === 'ACTIVE') { bClass = 'badge-ativo'; bTxt = 'Ativa'; }
     if (c.status === 'PAUSED') { bClass = 'badge-vencido'; bTxt = 'Pausada'; }
-    
+    if (c.status === 'DELETED') { bClass = 'badge-vencido'; bTxt = 'Excluída'; }
+
     const toggleAction = c.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
     const toggleLabel = c.status === 'ACTIVE' ? 'Pausar' : 'Ativar';
-    
+
     return `<tr>
       <td><span class="badge ${bClass}">${bTxt}</span></td>
-      <td><strong>${c.name}</strong></td>
+      <td><strong>${c.name || '—'}</strong></td>
       <td>${c.objective || '—'}</td>
-      <td style="cursor:pointer; color:var(--purple-light); text-decoration:underline;" onclick="metaUpdateBudget('${c.id}', '${c.name}', ${c.daily_budget || 0})">${budget} ✏️</td>
+      <td style="cursor:pointer; color:var(--purple-light); text-decoration:underline;" onclick="window.metaUpdateBudget('${c.id}', '${c.name}', ${c.daily_budget || 0})">${budget}</td>
       <td>${fmt(spend)}</td>
-      <td>${results} (aprox)</td>
+      <td>${impressions.toLocaleString('pt-BR')}</td>
+      <td>${clicks.toLocaleString('pt-BR')}</td>
+      <td>${leads.toLocaleString('pt-BR')}</td>
+      <td>${ctr.toFixed(2)}%</td>
+      <td>${fmt(cpl)}</td>
       <td>
-        <button class="action-btn action-edit" onclick="metaToggleStatus('${c.id}', '${toggleAction}')">${toggleLabel}</button>
+        <button class="action-btn action-edit" onclick="window.metaToggleStatus('${c.id}', '${toggleAction}')">${toggleLabel}</button>
+        <button class="action-btn action-delete" onclick="window.metaDeleteCampaign('${c.id}', '${c.name}')">Excluir</button>
       </td>
     </tr>`;
   }).join('');
 }
 
 window.metaToggleStatus = async (campaignId, status) => {
-  $('toast').textContent = 'Alterando status...'; show('toast');
+  console.log('[Meta Ads] Alternando status:', campaignId, status);
+  toast('Alterando status...', 'info');
   const res = await apiMeta(`/${campaignId}`, 'POST', { status });
   if (res) {
     toast('Status atualizado!', 'success');
-    fetchMetaCampaigns();
+    await fetchMetaCampaigns();
+    await fetchMetaMetrics();
+  }
+};
+
+window.metaDeleteCampaign = async (campaignId, name) => {
+  if (!confirm(`Tem certeza que deseja excluir a campanha "${name}"? Esta ação não pode ser desfeita.`)) return;
+  console.log('[Meta Ads] Excluindo campanha:', campaignId);
+  toast('Excluindo campanha...', 'info');
+  const res = await apiMeta(`/${campaignId}`, 'POST', { status: 'DELETED' });
+  if (res) {
+    toast('Campanha excluída!', 'success');
+    await fetchMetaCampaigns();
+    await fetchMetaMetrics();
   }
 };
 
@@ -2019,17 +2119,120 @@ window.metaUpdateBudget = async (campaignId, name, currentBudget) => {
   if (!novo) return;
   const num = parseFloat(novo.replace(',','.'));
   if (isNaN(num) || num <= 0) return toast('Valor inválido', 'error');
-  
+
   const budgetCents = Math.round(num * 100);
   const res = await apiMeta(`/${campaignId}`, 'POST', { daily_budget: budgetCents });
   if (res) {
     toast('Orçamento atualizado!', 'success');
-    fetchMetaCampaigns();
+    await fetchMetaCampaigns();
   }
 };
 
+async function updateMetaCharts(period) {
+  console.log('[Meta Ads] Atualizando gráficos para:', period);
+  // Gráfico de gastos por dia - simplificado
+  try {
+    const actId = metaConfigData.ad_account_id;
+    const res = await apiMeta(`/${actId}/insights`, 'GET', { 
+      date_preset: period,
+      fields: 'spend,clicks,impressions',
+      time_range: '{}',
+      breakdown: 'day'
+    });
+    
+    // TODO: Implementar quando tivermos dados históricos
+  } catch (e) {
+    console.error('[Meta Ads] Erro ao atualizar gráficos:', e);
+  }
+}
+
+async function fetchMetaAdSets() {
+  if (!metaConfigData) return;
+  const actId = metaConfigData.ad_account_id;
+  
+  console.log('[Meta Ads] Buscando conjuntos de anúncios...');
+  
+  const res = await apiMeta(`/${actId}/adsets`, 'GET', { 
+    fields: 'id,name,status,campaign_id,insights{spend,clicks,actions}' 
+  });
+  
+  const tbody = $('tbody-meta-conjuntos');
+  
+  if (!res || !res.data || res.data.length === 0) {
+    tbody.innerHTML = '';
+    show('meta-conjuntos-empty');
+    return;
+  }
+  
+  hide('meta-conjuntos-empty');
+  
+  tbody.innerHTML = res.data.map(adset => {
+    let spend = 0, clicks = 0, leads = 0;
+    
+    if (adset.insights && adset.insights.data && adset.insights.data.length > 0) {
+      const insights = adset.insights.data[0];
+      spend = insights.spend || 0;
+      clicks = insights.clicks || 0;
+      
+      if (insights.actions) {
+        const leadAction = insights.actions.find(a => a.action_type === 'lead');
+        if (leadAction) leads = parseInt(leadAction.value) || 0;
+      }
+    }
+    
+    const statusClass = adset.status === 'ACTIVE' ? 'badge-ativo' : adset.status === 'PAUSED' ? 'badge-vencido' : 'badge-pendente';
+    
+    return `<tr>
+      <td><strong>${adset.name || '—'}</strong></td>
+      <td>ID: ${adset.campaign_id || '—'}</td>
+      <td><span class="badge ${statusClass}">${adset.status}</span></td>
+      <td>${fmt(spend)}</td>
+      <td>${clicks.toLocaleString('pt-BR')}</td>
+      <td>${leads.toLocaleString('pt-BR')}</td>
+      <td>
+        <button class="action-btn action-edit" onclick="alert('Em breve: Editar conjunto')">Editar</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
 $('btn-meta-nova-campanha')?.addEventListener('click', async () => {
   toast('Para criar campanhas, use o Gerenciador de Anúncios do Meta para mais opções e precisão.', 'info');
+  // Abre o Gerenciador de Anúncios do Meta em nova aba
+  window.open('https://www.facebook.com/adsmanager/', '_blank');
+});
+
+// Filtro de status das campanhas
+$('meta-filter-status')?.addEventListener('change', async () => {
+  await fetchMetaCampaigns();
+});
+
+// Atualizar métricas ao mudar período
+$('meta-period')?.addEventListener('change', async () => {
+  await fetchMetaMetrics();
+});
+
+// Botão de refresh
+$('btn-meta-refresh')?.addEventListener('click', async () => {
+  toast('Atualizando dados...', 'info');
+  await fetchMetaMetrics();
+});
+
+// Botão de desconectar
+$('btn-meta-disconnect')?.addEventListener('click', async () => {
+  if (!confirm('Deseja realmente desconectar sua conta do Meta Ads?')) return;
+  
+  if (metaConfigData && metaConfigData.id) {
+    await db.from('meta_config').delete().eq('id', metaConfigData.id);
+  }
+  
+  metaConfigData = null;
+  $('meta-access-token').value = '';
+  $('meta-ad-account').value = '';
+  $('meta-status-badge').textContent = 'Desconectado';
+  $('meta-status-badge').className = 'status-badge red';
+  hide('meta-dashboard');
+  toast('Meta Ads desconectado!', 'success');
 });
 
 // Inicia o app ao final de todos os scripts

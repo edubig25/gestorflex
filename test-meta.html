@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teste Meta Ads</title>
+<style>
+  body {
+    background: #0a0718;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    padding: 20px;
+  }
+  .test-box {
+    background: rgba(124, 58, 237, 0.1);
+    border: 2px solid #7C3AED;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+  }
+  button {
+    background: linear-gradient(135deg, #7C3AED, #6D28D9);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    margin: 10px 5px;
+  }
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(124,58,237,0.3);
+  }
+  #result {
+    background: #0f0a1f;
+    border: 1px solid #7C3AED;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 20px;
+    min-height: 100px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+  }
+  .success { color: #10B981; }
+  .error { color: #EF4444; }
+  .info { color: #A78BFA; }
+</style>
+</head>
+<body>
+  <h1>🔍 Teste da Interface Meta Ads</h1>
+  
+  <div class="test-box">
+    <h3>Teste 1: Verificar se a página Meta Ads existe</h3>
+    <button onclick="testPageExists()">Testar</button>
+  </div>
+  
+  <div class="test-box">
+    <h3>Teste 2: Verificar navegação</h3>
+    <button onclick="testNavigation()">Navegar para Meta Ads</button>
+  </div>
+  
+  <div class="test-box">
+    <h3>Teste 3: Carregar Meta Ads manualmente</h3>
+    <button onclick="testLoadMetaAds()">Carregar Meta Ads</button>
+  </div>
+  
+  <div class="test-box">
+    <h3>Teste 4: Verificar formulário</h3>
+    <button onclick="testFormExists()">Verificar Formulário</button>
+  </div>
+  
+  <h3>📋 Resultados:</h3>
+  <div id="result">Aguardando testes...</div>
+  
+  <script>
+    let resultEl;
+    
+    function log(msg, type = 'info') {
+      if (!resultEl) resultEl = document.getElementById('result');
+      const color = type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#A78BFA';
+      resultEl.innerHTML += `<span style="color: ${color}">${msg}</span>\n`;
+      console.log(msg);
+    }
+    
+    function testPageExists() {
+      resultEl = document.getElementById('result');
+      resultEl.innerHTML = '';
+      
+      const page = document.getElementById('page-meta-ads');
+      if (page) {
+        log('✅ Página Meta Ads encontrada!', 'success');
+        log('   Classes: ' + page.className);
+        log('   ID: ' + page.id);
+      } else {
+        log('❌ Página Meta Ads NÃO encontrada!', 'error');
+      }
+    }
+    
+    function testNavigation() {
+      resultEl = document.getElementById('result');
+      resultEl.innerHTML = '';
+      
+      if (typeof navigateTo === 'function') {
+        log('✅ Função navigateTo encontrada', 'success');
+        log('   Navegando para meta-ads...', 'info');
+        navigateTo('meta-ads');
+        setTimeout(() => {
+          const page = document.getElementById('page-meta-ads');
+          if (page && page.classList.contains('active')) {
+            log('✅ Página Meta Ads está visível (classe active)', 'success');
+          } else {
+            log('⚠️ Página Meta Ads não está com classe active', 'error');
+          }
+        }, 100);
+      } else {
+        log('❌ Função navigateTo não encontrada', 'error');
+      }
+    }
+    
+    function testLoadMetaAds() {
+      resultEl = document.getElementById('result');
+      resultEl.innerHTML = '';
+      
+      if (typeof loadMetaAds === 'function') {
+        log('✅ Função loadMetaAds encontrada', 'success');
+        log('   Carregando Meta Ads...', 'info');
+        loadMetaAds().then(() => {
+          log('✅ loadMetaAds executado', 'success');
+        });
+      } else {
+        log('❌ Função loadMetaAds não encontrada', 'error');
+      }
+    }
+    
+    function testFormExists() {
+      resultEl = document.getElementById('result');
+      resultEl.innerHTML = '';
+      
+      const tokenInput = document.getElementById('meta-access-token');
+      const actInput = document.getElementById('meta-ad-account');
+      const btnConnect = document.getElementById('btn-meta-connect');
+      
+      log('📋 Verificando elementos do formulário:', 'info');
+      
+      if (tokenInput) {
+        log('✅ Input "meta-access-token" encontrado', 'success');
+        log('   Valor atual: ' + (tokenInput.value ? 'Tem valor' : 'Vazio'));
+      } else {
+        log('❌ Input "meta-access-token" NÃO encontrado', 'error');
+      }
+      
+      if (actInput) {
+        log('✅ Input "meta-ad-account" encontrado', 'success');
+        log('   Valor atual: ' + (actInput.value ? 'Tem valor' : 'Vazio'));
+      } else {
+        log('❌ Input "meta-ad-account" NÃO encontrado', 'error');
+      }
+      
+      if (btnConnect) {
+        log('✅ Botão "btn-meta-connect" encontrado', 'success');
+      } else {
+        log('❌ Botão "btn-meta-connect" NÃO encontrado', 'error');
+      }
+    }
+    
+    log('🚀 Clique nos botões acima para testar', 'info');
+  </script>
+</body>
+</html>
