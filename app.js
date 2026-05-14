@@ -631,9 +631,13 @@ function renderCaixaAtual(clientes, pagamentos = []) {
     .filter(c => c.status === 'Pendente')
     .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
 
-  // Inadimplente: clientes Vencidos
+  // Inadimplente: clientes Vencidos no mês atual
   const vencido = clientes
-    .filter(c => c.status === 'Vencido')
+    .filter(c => {
+      if (c.status !== 'Vencido' || !c.vencimento) return false;
+      const d = new Date(c.vencimento + 'T00:00:00');
+      return d.getMonth() === mes && d.getFullYear() === ano;
+    })
     .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
 
   const totalPotencial = caixaReal + pendente + vencido;
