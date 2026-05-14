@@ -28,6 +28,24 @@ try {
   alert('Erro ao iniciar banco: ' + e.message);
 }
 
+// === HELPER PARA FETCH ALL (bypassa limite 1000 do Supabase) ===
+async function fetchAll(table, select = '*', orderCol = null, orderAsc = true) {
+  let allData = [];
+  let from = 0;
+  const limit = 1000;
+  while (true) {
+    let query = db.from(table).select(select).range(from, from + limit - 1);
+    if (orderCol) query = query.order(orderCol, { ascending: orderAsc });
+    const { data, error } = await query;
+    if (error) { console.error('Error fetching', table, error); break; }
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < limit) break;
+    from += limit;
+  }
+  return { data: allData };
+}
+
 // === STATE ===
 let currentUser = null;
 let allClientes = [];
@@ -583,8 +601,8 @@ $('menu-toggle').addEventListener('click', () => $('sidebar').classList.toggle('
 // === DASHBOARD ===
 async function loadDashboard() {
   const [{ data: clientes }, { data: pagamentos }] = await Promise.all([
-    db.from('clientes').select('*'),
-    db.from('pagamentos').select('*')
+    fetchAll('clientes', '*'),
+    fetchAll('pagamentos', '*')
   ]);
   allClientes = clientes || [];
   renderCaixaAtual(allClientes, pagamentos || []);
@@ -813,7 +831,7 @@ function checkNotifVencendo(clientes) {
 
 // === CLIENTES ===
 async function loadClientes() {
-  const { data } = await db.from('clientes').select('*, servidores(nome)').order('created_at', { ascending: false });
+  const { data } = await fetchAll('clientes', '*, servidores(nome)', 'created_at', false);
   allClientes = data || [];
   renderTabela(allClientes);
 }
@@ -1080,7 +1098,7 @@ async function renovar(id) {
 let allFaturas = [];
 
 async function loadFaturas() {
-  const { data } = await db.from('pagamentos').select('*').order('data_pagamento', { ascending: false });
+  const { data } = await fetchAll('pagamentos', '*', 'data_pagamento', false);
   allFaturas = data || [];
   renderFaturas(allFaturas);
   bindFaturaFilters();
@@ -1176,8 +1194,8 @@ function bindFaturaFilters() {
 
 async function loadFinanceiro() {
   const [{ data: clientesData }, { data: pagamentosData }] = await Promise.all([
-    db.from('clientes').select('*'),
-    db.from('pagamentos').select('*').order('data_pagamento', { ascending: false })
+    fetchAll('clientes', '*'),
+    fetchAll('pagamentos', '*', 'data_pagamento', false)
   ]);
   const clientes = clientesData || [];
   const pagamentos = pagamentosData || [];
@@ -1333,7 +1351,7 @@ $('fin-period')?.addEventListener('change', loadFinanceiro);
 // Filtro de mês do histórico de pagamentos (sem recarregar tudo)
 document.addEventListener('change', async e => {
   if (e.target && e.target.id === 'fin-pag-mes') {
-    const { data } = await db.from('pagamentos').select('*').order('data_pagamento', { ascending: false });
+    const { data } = await fetchAll('pagamentos', '*', 'data_pagamento', false);
     renderPagamentosTabela(data || [], e.target.value);
   }
 });
@@ -1342,7 +1360,7 @@ document.addEventListener('change', async e => {
 const CAP_CORES = ['#7C3AED', '#A78BFA', '#10B981', '#F59E0B', '#EF4444', '#60A5FA'];
 
 async function loadCaptacao() {
-  const { data } = await db.from('clientes').select('origem, status');
+  const { data } = await fetchAll('clientes', 'origem, status');
   const clientes = data || [];
 
   const contagem = {};
@@ -1427,7 +1445,7 @@ async function loadPlanosPage() {
   if (!tbody) return;
 
   // Count clientes per plan
-  const { data: clData } = await db.from('clientes').select('plano, valor, status');
+  const { data: clData } = await fetchAll('clientes', 'plano, valor, status');
   const clientes = clData || [];
 
   if (allPlanos.length === 0) { tbody.innerHTML = ''; show('planos-empty'); }
