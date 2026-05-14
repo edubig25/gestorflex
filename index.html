@@ -28,6 +28,7 @@
   </div>
   <div class="splash-spinner"></div>
 </div>
+<div id="toast" class="toast hidden"></div>
 <script>
   // Mata qualquer Service Worker antigo que esteja travando o cache
   if ('serviceWorker' in navigator) {
@@ -101,6 +102,7 @@
     <nav class="sidebar-nav">
       <a href="#" class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
       <a href="#" class="nav-item" data-page="clientes"><span class="nav-icon">👥</span><span class="nav-label">Clientes</span></a>
+      <a href="#" class="nav-item" data-page="faturas"><span class="nav-icon">🧾</span><span class="nav-label">Faturas</span></a>
       <a href="#" class="nav-item" data-page="financeiro"><span class="nav-icon">💰</span><span class="nav-label">Financeiro</span></a>
       <a href="#" class="nav-item" data-page="captacao"><span class="nav-icon">📡</span><span class="nav-label">Captação</span></a>
       <a href="#" class="nav-item" data-page="planos"><span class="nav-icon">🏷️</span><span class="nav-label">Planos</span></a>
@@ -173,18 +175,85 @@
       <div class="metrics-grid">
         <div class="metric-card"><div class="metric-icon">👥</div><div class="metric-info"><span class="metric-label">Total de Clientes</span><span class="metric-value" id="m-total">—</span></div></div>
         <div class="metric-card green"><div class="metric-icon">✅</div><div class="metric-info"><span class="metric-label">Clientes Ativos</span><span class="metric-value" id="m-ativos">—</span></div></div>
-        <div class="metric-card yellow"><div class="metric-icon">⏰</div><div class="metric-info"><span class="metric-label">Vencendo em 7 dias</span><span class="metric-value" id="m-vencendo">—</span></div></div>
-        <div class="metric-card purple"><div class="metric-icon">💰</div><div class="metric-info"><span class="metric-label">Receita do Mês</span><span class="metric-value" id="m-receita">—</span></div></div>
+        <div class="metric-card red" style="border-color:rgba(239,68,68,.2);box-shadow:0 8px 32px rgba(239,68,68,.05)"><div class="metric-icon">❌</div><div class="metric-info"><span class="metric-label">Clientes Expirados</span><span class="metric-value" id="m-expirados">—</span></div></div>
+        <div class="metric-card yellow"><div class="metric-icon">⏰</div><div class="metric-info"><span class="metric-label">Vencem Hoje</span><span class="metric-value" id="m-vencem-hoje">—</span></div></div>
       </div>
+
+      <!-- URGENCY ALERT STRIP -->
+      <div class="urgency-strip" id="urgency-strip">
+        <div class="urgency-item today" id="urg-hoje">
+          <span class="urg-icon">🔴</span>
+          <div>
+            <div class="urg-label">Vencem Hoje</div>
+            <div class="urg-val" id="urg-val-hoje">—</div>
+          </div>
+        </div>
+        <div class="urgency-item three" id="urg-3dias">
+          <span class="urg-icon">🟡</span>
+          <div>
+            <div class="urg-label">Vencem em 3 dias</div>
+            <div class="urg-val" id="urg-val-3">—</div>
+          </div>
+        </div>
+        <div class="urgency-item week" id="urg-7dias">
+          <span class="urg-icon">🟠</span>
+          <div>
+            <div class="urg-label">Vencem em 7 dias</div>
+            <div class="urg-val" id="urg-val-7">—</div>
+          </div>
+        </div>
+        <div class="urgency-item new" id="urg-novos">
+          <span class="urg-icon">🆕</span>
+          <div>
+            <div class="urg-label">Novos este mês</div>
+            <div class="urg-val" id="urg-val-novos">—</div>
+          </div>
+        </div>
+      </div>
+
       <div class="dash-grid">
-        <div class="card chart-card"><div class="card-header"><h3>Receita — Últimos 6 Meses</h3></div><canvas id="chart-receita" height="220"></canvas></div>
-        <div class="card"><div class="card-header"><h3>⏰ Vencendo nos próximos 7 dias</h3></div><div id="lista-vencendo" class="vencendo-list"></div></div>
+        <div class="card chart-card">
+          <div class="card-header">
+            <h3>📈 Entradas vs Saídas — Últimos 8 Meses</h3>
+            <div style="display:flex;align-items:center;gap:12px;font-size:.78rem;color:var(--text-muted);">
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:#10B981;border-radius:50%;display:inline-block;"></span>Entradas</span>
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:#EF4444;border-radius:50%;display:inline-block;"></span>Saídas</span>
+            </div>
+          </div>
+          <canvas id="chart-receita" height="220"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>🍩 Situação dos Clientes</h3></div>
+          <div class="donut-wrap"><canvas id="chart-dash-status" width="200" height="200"></canvas></div>
+          <div id="dash-status-legend" class="fin-legend"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header"><h3>⏰ Vencendo nos próximos 7 dias</h3></div>
+        <div id="lista-vencendo" class="vencendo-list"></div>
       </div>
     </div>
 
     <!-- CLIENTES -->
     <div id="page-clientes" class="page">
-      <div class="page-header"><h1>Clientes</h1><button class="btn-primary" id="btn-add-cliente">+ Adicionar Cliente</button></div>
+      <div class="page-header">
+        <div><h1>Clientes</h1><p>Gerencie todos os seus clientes</p></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-secondary" id="btn-cobranca-avulsa" style="border:1px solid rgba(245,158,11,.3);color:#fbbf24;">💸 Cobrança Avulsa</button>
+          <button class="btn-primary" id="btn-add-cliente">+ Adicionar Cliente</button>
+        </div>
+      </div>
+
+      <!-- URGENCY CHIPS -->
+      <div class="urgency-chips">
+        <button class="urg-chip" data-urgency="" id="chip-todos">👥 Todos</button>
+        <button class="urg-chip danger" data-urgency="hoje" id="chip-hoje">🔴 Vence Hoje</button>
+        <button class="urg-chip warning" data-urgency="3dias" id="chip-3dias">🟡 3 Dias</button>
+        <button class="urg-chip orange" data-urgency="7dias" id="chip-7dias">🟠 7 Dias</button>
+        <button class="urg-chip red" data-urgency="expirados" id="chip-expirados">❌ Expirados</button>
+        <button class="urg-chip new" data-urgency="novos" id="chip-novos">🆕 Novos</button>
+      </div>
+
       <div class="filters-bar">
         <input type="text" id="search-cliente" placeholder="🔍  Buscar por nome..." class="search-input">
         <select id="filter-status" class="filter-select">
@@ -200,6 +269,81 @@
       </div>
     </div>
 
+    <!-- FATURAS -->
+    <div id="page-faturas" class="page">
+      <div class="page-header">
+        <div><h1>🧾 Faturas</h1><p>Histórico completo de cobranças geradas</p></div>
+        <div style="display:flex;gap:10px;">
+          <select id="fat-filter-status" class="filter-select" style="width:auto;">
+            <option value="">Todos</option>
+            <option value="Aprovado">✅ Aprovado</option>
+            <option value="Pendente">⏳ Pendente</option>
+            <option value="Vencido">❌ Vencido</option>
+          </select>
+          <input type="month" id="fat-filter-mes" class="filter-select" style="font-size:.85rem;padding:10px 14px;">
+        </div>
+      </div>
+
+      <!-- RESUMO FATURAS -->
+      <div class="fat-summary-grid">
+        <div class="fat-summary-card approved">
+          <div class="fat-sum-icon">✅</div>
+          <div>
+            <div class="fat-sum-label">Aprovadas</div>
+            <div class="fat-sum-val" id="fat-total-aprovado">—</div>
+            <div class="fat-sum-count" id="fat-count-aprovado">0 faturas</div>
+          </div>
+        </div>
+        <div class="fat-summary-card pending">
+          <div class="fat-sum-icon">⏳</div>
+          <div>
+            <div class="fat-sum-label">Pendentes</div>
+            <div class="fat-sum-val" id="fat-total-pendente">—</div>
+            <div class="fat-sum-count" id="fat-count-pendente">0 faturas</div>
+          </div>
+        </div>
+        <div class="fat-summary-card expired">
+          <div class="fat-sum-icon">❌</div>
+          <div>
+            <div class="fat-sum-label">Vencidas</div>
+            <div class="fat-sum-val" id="fat-total-vencido">—</div>
+            <div class="fat-sum-count" id="fat-count-vencido">0 faturas</div>
+          </div>
+        </div>
+        <div class="fat-summary-card total">
+          <div class="fat-sum-icon">📊</div>
+          <div>
+            <div class="fat-sum-label">Total Geral</div>
+            <div class="fat-sum-val" id="fat-total-geral">—</div>
+            <div class="fat-sum-count" id="fat-count-total">0 faturas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="filters-bar" style="margin-top:0;">
+        <input type="text" id="search-faturas" placeholder="🔍  Buscar por cliente..." class="search-input">
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cliente</th>
+              <th>Plano</th>
+              <th>Valor</th>
+              <th>Vencimento</th>
+              <th>Data Pag.</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-faturas"></tbody>
+        </table>
+        <div id="faturas-empty" class="empty-state hidden"><span>🧾</span><p>Nenhuma fatura encontrada.</p></div>
+      </div>
+    </div>
+
     <!-- FINANCEIRO -->
     <div id="page-financeiro" class="page">
       <div class="page-header">
@@ -211,23 +355,46 @@
           <option value="12">Este Ano</option>
         </select>
       </div>
-      <div class="fin-top-cards">
-        <div class="fin-card-big">
-          <div class="fin-card-icon" style="background:rgba(124,58,237,.2);color:var(--purple-light);">💰</div>
-          <div class="fin-card-info"><span class="fin-card-label">Receita do Mês</span><span class="fin-card-value" id="fin-receita-mes">—</span></div>
+      <!-- COBREI-STYLE: SALDO / ENTRADA / SAÍDA -->
+      <div class="carteira-hero-grid">
+        <div class="carteira-hero-card saldo">
+          <div class="carteira-card-top">
+            <span class="carteira-card-label">💼 Saldo</span>
+            <button class="carteira-eye-btn" id="btn-toggle-saldo" title="Ocultar/Mostrar">👁</button>
+          </div>
+          <div class="carteira-card-value" id="fin-saldo" data-hidden="false">—</div>
+          <div class="carteira-card-sub">Caixa atual disponível</div>
         </div>
-        <div class="fin-card-big">
-          <div class="fin-card-icon" style="background:rgba(16,185,129,.2);color:#34d399;">↑</div>
-          <div class="fin-card-info"><span class="fin-card-label">Clientes Ativos</span><span class="fin-card-value" id="fin-ativos-count">—</span></div>
+        <div class="carteira-hero-card entrada">
+          <div class="carteira-card-top">
+            <span class="carteira-card-label">↑ Entrada</span>
+            <button class="carteira-add-btn" id="btn-add-entrada" title="Registrar entrada">＋</button>
+          </div>
+          <div class="carteira-card-value green" id="fin-entrada-total">—</div>
+          <div class="carteira-card-sub">Total recebido no período</div>
         </div>
-        <div class="fin-card-big">
-          <div class="fin-card-icon" style="background:rgba(245,158,11,.2);color:#fbbf24;">📋</div>
-          <div class="fin-card-info"><span class="fin-card-label">Em Aberto</span><span class="fin-card-value" id="fin-em-aberto">—</span></div>
+        <div class="carteira-hero-card saida">
+          <div class="carteira-card-top">
+            <span class="carteira-card-label">↓ Saída</span>
+            <button class="carteira-add-btn" id="btn-add-saida" title="Registrar saída">＋</button>
+          </div>
+          <div class="carteira-card-value red" id="fin-saida-total">—</div>
+          <div class="carteira-card-sub">Total de gastos no período</div>
         </div>
-        <div class="fin-card-big">
-          <div class="fin-card-icon" style="background:rgba(239,68,68,.2);color:#f87171;">⚠️</div>
-          <div class="fin-card-info"><span class="fin-card-label">Clientes Vencidos</span><span class="fin-card-value" id="fin-vencidos-count">—</span></div>
+        <div class="carteira-hero-card vencidos">
+          <div class="carteira-card-top">
+            <span class="carteira-card-label">⚠️ Inadimplência</span>
+          </div>
+          <div class="carteira-card-value orange" id="fin-vencidos-count">—</div>
+          <div class="carteira-card-sub">Clientes vencidos</div>
         </div>
+      </div>
+
+      <!-- LEGACY COMPAT -->
+      <div style="display:none">
+        <span id="fin-receita-mes"></span>
+        <span id="fin-ativos-count"></span>
+        <span id="fin-em-aberto"></span>
       </div>
       <div class="dash-grid" style="grid-template-columns:1.7fr 1fr;margin-top:20px;">
         <div class="card chart-card">
@@ -965,6 +1132,47 @@
       <div class="modal-actions">
         <button type="button" class="btn-secondary" id="btn-cancelar-modal">Cancelar</button>
         <button type="submit" class="btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL COBRANÇA AVULSA -->
+<div id="modal-cobranca-avulsa" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header"><h3>💸 Cobrança Avulsa</h3><button class="modal-close" id="modal-avulsa-close">✕</button></div>
+    <form id="form-cobranca-avulsa" class="modal-form">
+      <div class="field-group">
+        <label>Cliente *</label>
+        <select id="avulsa-cliente" required>
+          <option value="">Selecione o cliente</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="field-group">
+          <label>Valor (R$) *</label>
+          <input type="number" id="avulsa-valor" placeholder="0.00" step="0.01" min="0" required>
+        </div>
+        <div class="field-group">
+          <label>Vencimento *</label>
+          <input type="date" id="avulsa-vencimento" required>
+        </div>
+      </div>
+      <div class="field-group">
+        <label>Descrição / Motivo</label>
+        <input type="text" id="avulsa-descricao" placeholder="Ex: Cobrança adicional, Taxa de instalação...">
+      </div>
+      <div class="field-group">
+        <label>Enviar cobrança via WhatsApp?</label>
+        <div style="display:flex;gap:20px;margin-top:8px;">
+          <label class="cb-label"><input type="radio" name="avulsa-wpp" value="sim" checked> ✅ Sim, enviar agora</label>
+          <label class="cb-label"><input type="radio" name="avulsa-wpp" value="nao"> ❌ Não</label>
+        </div>
+      </div>
+      <div id="avulsa-error" class="error-msg hidden"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="btn-cancelar-avulsa">Cancelar</button>
+        <button type="submit" class="btn-primary" style="background:linear-gradient(135deg,#d97706,#f59e0b);">💸 Gerar Cobrança</button>
       </div>
     </form>
   </div>

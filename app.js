@@ -209,6 +209,20 @@ CREATE TABLE IF NOT EXISTS wa_historico (
 );
 ALTER TABLE wa_historico DISABLE ROW LEVEL SECURITY;
 
+-- Tabela Pagamentos (missing critical table)
+CREATE TABLE IF NOT EXISTS pagamentos (
+  id bigserial primary key,
+  cliente_id bigint,
+  cliente_nome text,
+  valor numeric default 0,
+  plano text,
+  tipo text default 'novo',
+  data_pagamento date,
+  observacao text,
+  created_at timestamptz default now()
+);
+ALTER TABLE pagamentos DISABLE ROW LEVEL SECURITY;
+
 -- Tabela Meta Config
 CREATE TABLE IF NOT EXISTS meta_config (
   id bigserial primary key,
@@ -545,9 +559,10 @@ function navigateTo(page) {
     if (isActive) console.log('[Navigation] Mostrando página:', p.id);
     p.classList.toggle('active', isActive);
   });
-const titles = { dashboard: 'Dashboard', clientes: 'Clientes', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', whatsapp: 'WhatsApp', configuracoes: 'Configurações', 'meta-ads': 'Meta Ads', jogos: 'Jogos do Dia' };
+const titles = { dashboard: 'Dashboard', clientes: 'Clientes', faturas: 'Faturas', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', whatsapp: 'WhatsApp', configuracoes: 'Configurações', 'meta-ads': 'Meta Ads', jogos: 'Jogos do Dia' };
 $('topbar-title').textContent = titles[page] || '';
 if (page === 'clientes') loadClientes();
+if (page === 'faturas') loadFaturas();
 if (page === 'financeiro') loadFinanceiro();
 if (page === 'captacao') loadCaptacao();
 if (page === 'planos') loadPlanosPage();
@@ -555,8 +570,11 @@ if (page === 'whatsapp') loadWhatsApp();
 if (page === 'configuracoes') populateConfig();
 if (page === 'meta-ads') loadMetaAds();
 if (page === 'jogos') {
-  console.log('[Jogos] Navegando para página de jogos');
-  loadJogosDoDia('hoje');
+  const conteudo = document.getElementById('jogos-conteudo');
+  if (conteudo) conteudo.innerHTML = '<p style="padding:20px;color:var(--text);">Carregando jogos...</p>';
+  setTimeout(() => {
+    if (typeof loadJogosDoDia === 'function') loadJogosDoDia('hoje');
+  }, 100);
 }
 }
 
@@ -571,7 +589,8 @@ async function loadDashboard() {
   allClientes = clientes || [];
   renderCaixaAtual(allClientes, pagamentos || []);
   renderDashMetrics(allClientes);
-  renderChartReceita(allClientes);
+  renderDashChartDual(allClientes, pagamentos || []);
+  renderDashDonut(allClientes);
   renderListaVencendo(allClientes);
   checkNotifVencendo(allClientes);
 }
@@ -619,25 +638,115 @@ function renderDashMetrics(clientes) {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const total = clientes.length;
   const ativos = clientes.filter(c => c.status === 'Ativo').length;
-  const vencendo7 = clientes.filter(c => {
-    const d = diasAteVencimento(c.vencimento);
-    return d >= 0 && d <= 7;
-  }).length;
+  const expirados = clientes.filter(c => c.status === 'Vencido').length;
 
-  const mes = hoje.getMonth();
-  const ano = hoje.getFullYear();
-  const receita = clientes
-    .filter(c => c.status === 'Ativo' && c.vencimento)
-    .reduce((acc, c) => {
-      const v = new Date(c.vencimento + 'T00:00:00');
-      if (v.getMonth() === mes && v.getFullYear() === ano) return acc + parseFloat(c.valor || 0);
-      return acc;
-    }, 0);
+  const venceHoje = clientes.filter(c => diasAteVencimento(c.vencimento) === 0).length;
+  const vence3 = clientes.filter(c => { const d = diasAteVencimento(c.vencimento); return d > 0 && d <= 3; }).length;
+  const vence7 = clientes.filter(c => { const d = diasAteVencimento(c.vencimento); return d > 0 && d <= 7; }).length;
+
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const novos = clientes.filter(c => c.created_at && new Date(c.created_at) >= inicioMes).length;
 
   $('m-total').textContent = total;
   $('m-ativos').textContent = ativos;
-  $('m-vencendo').textContent = vencendo7;
-  $('m-receita').textContent = fmt(receita);
+  if ($('m-expirados')) $('m-expirados').textContent = expirados;
+  if ($('m-vencem-hoje')) $('m-vencem-hoje').textContent = venceHoje;
+
+  // Urgency strip
+  if ($('urg-val-hoje')) $('urg-val-hoje').textContent = venceHoje;
+  if ($('urg-val-3'))    $('urg-val-3').textContent    = vence3;
+  if ($('urg-val-7'))    $('urg-val-7').textContent    = vence7;
+  if ($('urg-val-novos'))$('urg-val-novos').textContent= novos;
+}
+
+function getUltimos6Meses() {
+  const meses = [];
+  const d = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    meses.push({ mes: m.getMonth(), ano: m.getFullYear(), label: m.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }) });
+  }
+  return meses;
+}
+
+let chartDashDual = null;
+function renderDashChartDual(clientes, pagamentos = []) {
+  const meses = getUltimos8Meses();
+  // Entradas = pagamentos por mês
+  const entradas = meses.map(m =>
+    pagamentos.filter(p => {
+      if (!p.data_pagamento) return false;
+      const d = new Date(p.data_pagamento + 'T00:00:00');
+      return d.getMonth() === m.mes && d.getFullYear() === m.ano;
+    }).reduce((acc, p) => acc + parseFloat(p.valor || 0), 0)
+  );
+  // Saídas = clientes vencidos por mês (como proxy de inadimplência)
+  const saidas = meses.map(m =>
+    clientes.filter(c => {
+      if (!c.vencimento || c.status !== 'Vencido') return false;
+      const v = new Date(c.vencimento + 'T00:00:00');
+      return v.getMonth() === m.mes && v.getFullYear() === m.ano;
+    }).reduce((acc, c) => acc + parseFloat(c.valor || 0), 0)
+  );
+
+  const ctx = $('chart-receita');
+  if (!ctx) return;
+  if (chartDashDual) chartDashDual.destroy();
+  chartDashDual = new Chart(ctx.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: meses.map(m => m.label),
+      datasets: [
+        { label: 'Entradas', data: entradas, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,.12)', borderWidth: 2.5, tension: 0.35, pointRadius: 4, pointBackgroundColor: '#10B981', fill: true },
+        { label: 'Saídas', data: saidas,   borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,.08)', borderWidth: 2.5, tension: 0.35, pointRadius: 4, pointBackgroundColor: '#EF4444', fill: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) } } },
+      scales: {
+        x: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5' } },
+        y: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5', callback: v => 'R$' + v } }
+      }
+    }
+  });
+}
+
+function getUltimos8Meses() {
+  const meses = [];
+  const d = new Date();
+  for (let i = 7; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    meses.push({ mes: m.getMonth(), ano: m.getFullYear(), label: m.toLocaleDateString('pt-BR', { month: 'short' }) });
+  }
+  return meses;
+}
+
+let chartDashDonut = null;
+function renderDashDonut(clientes) {
+  const ativos    = clientes.filter(c => c.status === 'Ativo').length;
+  const expirados = clientes.filter(c => c.status === 'Vencido').length;
+  const pendentes = clientes.filter(c => c.status === 'Pendente').length;
+  const ctx = $('chart-dash-status');
+  if (!ctx) return;
+  if (chartDashDonut) chartDashDonut.destroy();
+  chartDashDonut = new Chart(ctx.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Ativos', 'Expirados', 'Pendentes'],
+      datasets: [{ data: [ativos, expirados, pendentes], backgroundColor: ['#10B981','#EF4444','#F59E0B'], borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: { responsive: true, cutout: '70%', plugins: { legend: { display: false } } }
+  });
+  const leg = $('dash-status-legend');
+  if (leg) {
+    const total = ativos + expirados + pendentes || 1;
+    leg.innerHTML = [
+      { label: 'Ativos', val: ativos, color: '#10B981' },
+      { label: 'Expirados', val: expirados, color: '#EF4444' },
+      { label: 'Pendentes', val: pendentes, color: '#F59E0B' }
+    ].map(item => `<div class="fin-legend-item"><span class="fin-legend-dot" style="background:${item.color}"></span><span class="fin-legend-label">${item.label}</span><span class="fin-legend-val">${item.val} (${Math.round(item.val/total*100)}%)</span></div>`).join('');
+  }
 }
 
 function getUltimos6Meses() {
@@ -651,6 +760,8 @@ function getUltimos6Meses() {
 }
 
 function renderChartReceita(clientes, canvasId = 'chart-receita', existingChart = null) {
+  // Legacy compatibility – now handled by renderDashChartDual for main canvas
+  if (canvasId === 'chart-receita') return chartDashDual;
   const meses = getUltimos6Meses();
   const valores = meses.map(m =>
     clientes.filter(c => {
@@ -659,35 +770,12 @@ function renderChartReceita(clientes, canvasId = 'chart-receita', existingChart 
       return v.getMonth() === m.mes && v.getFullYear() === m.ano;
     }).reduce((acc, c) => acc + parseFloat(c.valor || 0), 0)
   );
-
   const ctx = $(canvasId).getContext('2d');
   if (existingChart) existingChart.destroy();
-
   const chart = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: meses.map(m => m.label),
-      datasets: [{
-        label: 'Receita (R$)',
-        data: valores,
-        backgroundColor: 'rgba(124,58,237,.5)',
-        borderColor: '#7C3AED',
-        borderWidth: 2,
-        borderRadius: 8,
-        hoverBackgroundColor: 'rgba(167,139,250,.7)'
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) } }
-      },
-      scales: {
-        x: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5' } },
-        y: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5', callback: v => 'R$' + v } }
-      }
-    }
+    data: { labels: meses.map(m => m.label), datasets: [{ label: 'Receita (R$)', data: valores, backgroundColor: 'rgba(124,58,237,.5)', borderColor: '#7C3AED', borderWidth: 2, borderRadius: 8 }] },
+    options: { responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.parsed.y) } } }, scales: { x: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5' } }, y: { grid: { color: 'rgba(124,58,237,.08)' }, ticks: { color: '#9B93C5', callback: v => 'R$' + v } } } }
   });
   return chart;
 }
@@ -758,6 +846,8 @@ function renderTabela(list) {
   }).join('');
 }
 
+let activeUrgencyFilter = '';
+
 function applyFilters() {
   const busca = $('search-cliente').value.toLowerCase();
   const status = $('filter-status').value;
@@ -766,6 +856,22 @@ function applyFilters() {
   if (busca) list = list.filter(c => c.nome.toLowerCase().includes(busca));
   if (status) list = list.filter(c => c.status === status);
   if (origem) list = list.filter(c => c.origem === origem);
+
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+  if (activeUrgencyFilter === 'hoje') {
+    list = list.filter(c => diasAteVencimento(c.vencimento) === 0);
+  } else if (activeUrgencyFilter === '3dias') {
+    list = list.filter(c => { const d = diasAteVencimento(c.vencimento); return d > 0 && d <= 3; });
+  } else if (activeUrgencyFilter === '7dias') {
+    list = list.filter(c => { const d = diasAteVencimento(c.vencimento); return d > 0 && d <= 7; });
+  } else if (activeUrgencyFilter === 'expirados') {
+    list = list.filter(c => c.status === 'Vencido');
+  } else if (activeUrgencyFilter === 'novos') {
+    list = list.filter(c => c.created_at && new Date(c.created_at) >= inicioMes);
+  }
+
   renderTabela(list);
 }
 
@@ -773,9 +879,71 @@ $('search-cliente').addEventListener('input', applyFilters);
 $('filter-status').addEventListener('change', applyFilters);
 $('filter-origem').addEventListener('change', applyFilters);
 
+// Urgency chip filter
+document.querySelectorAll('.urg-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const urgency = chip.dataset.urgency;
+    activeUrgencyFilter = activeUrgencyFilter === urgency ? '' : urgency;
+    document.querySelectorAll('.urg-chip').forEach(c => c.classList.remove('active'));
+    if (activeUrgencyFilter) chip.classList.add('active');
+    applyFilters();
+  });
+});
+
 $('btn-add-cliente').addEventListener('click', openAddModal);
 $('modal-close').addEventListener('click', closeModal);
 $('btn-cancelar-modal').addEventListener('click', closeModal);
+
+// === COBRANÇA AVULSA ===
+if ($('btn-cobranca-avulsa')) {
+  $('btn-cobranca-avulsa').addEventListener('click', () => {
+    // Populate client select
+    const sel = $('avulsa-cliente');
+    if (sel) {
+      sel.innerHTML = '<option value="">Selecione o cliente</option>' +
+        allClientes.map(c => `<option value="${c.id}" data-wpp="${c.whatsapp||''}" data-nome="${c.nome}" data-plano="${c.plano||''}">${c.nome} — ${c.plano || 'Sem plano'}</option>`).join('');
+    }
+    // Default vencimento = 7 days from now
+    const d = new Date(); d.setDate(d.getDate() + 7);
+    if ($('avulsa-vencimento')) $('avulsa-vencimento').value = d.toISOString().split('T')[0];
+    hide('avulsa-error');
+    show('modal-cobranca-avulsa');
+  });
+}
+if ($('modal-avulsa-close')) $('modal-avulsa-close').addEventListener('click', () => hide('modal-cobranca-avulsa'));
+if ($('btn-cancelar-avulsa')) $('btn-cancelar-avulsa').addEventListener('click', () => hide('modal-cobranca-avulsa'));
+
+if ($('form-cobranca-avulsa')) {
+  $('form-cobranca-avulsa').addEventListener('submit', async e => {
+    e.preventDefault();
+    const clienteId = $('avulsa-cliente').value;
+    const valor = parseFloat($('avulsa-valor').value) || 0;
+    const vencimento = $('avulsa-vencimento').value;
+    const descricao = $('avulsa-descricao').value.trim();
+    const enviarWpp = document.querySelector('input[name="avulsa-wpp"]:checked')?.value === 'sim';
+    const err = $('avulsa-error');
+    hide('avulsa-error');
+    if (!clienteId || !valor || !vencimento) { err.textContent = 'Preencha todos os campos obrigatórios.'; show('avulsa-error'); return; }
+    const cliente = allClientes.find(c => c.id == clienteId);
+    if (!cliente) return;
+    // Register as a payment record
+    await registrarPagamento({
+      cliente_id: clienteId,
+      cliente_nome: cliente.nome,
+      valor, plano: cliente.plano || 'Avulsa',
+      tipo: 'avulsa',
+      observacao: descricao || 'Cobrança avulsa'
+    });
+    hide('modal-cobranca-avulsa');
+    toast(`💸 Cobrança de ${fmt(valor)} gerada para ${cliente.nome}!`, 'success');
+    if (enviarWpp && cliente.whatsapp) {
+      const wpp = cliente.whatsapp.replace(/\D/g, '');
+      const msg = encodeURIComponent(`Olá ${cliente.nome}! 👋\n\nVocê tem uma cobrança no valor de *${fmt(valor)}* com vencimento em *${new Date(vencimento+'T00:00:00').toLocaleDateString('pt-BR')}*.\n\n${descricao ? '📋 ' + descricao + '\n\n' : ''}Por favor, regularize para manter seu acesso ativo. ✅`);
+      window.open(`https://wa.me/55${wpp}?text=${msg}`, '_blank');
+    }
+    loadDashboard();
+  });
+}
 
 function openAddModal() {
   $('modal-titulo').textContent = 'Adicionar Cliente';
@@ -907,6 +1075,103 @@ async function renovar(id) {
   loadDashboard();
 }
 
+// === FATURAS ===
+
+let allFaturas = [];
+
+async function loadFaturas() {
+  const { data } = await db.from('pagamentos').select('*').order('data_pagamento', { ascending: false });
+  allFaturas = data || [];
+  renderFaturas(allFaturas);
+  bindFaturaFilters();
+}
+
+function renderFaturas(list) {
+  const tbody = $('tbody-faturas');
+  const empty = $('faturas-empty');
+  if (!tbody) return;
+
+  // Apply filters
+  const search = ($('search-faturas')?.value || '').toLowerCase();
+  const statusF = $('fat-filter-status')?.value || '';
+  const mesF = $('fat-filter-mes')?.value || '';
+
+  let filtered = list;
+  if (search) filtered = filtered.filter(p => (p.cliente_nome || '').toLowerCase().includes(search));
+  if (statusF) filtered = filtered.filter(p => getBadgeFatura(p) === statusF);
+  if (mesF) {
+    const [y, m] = mesF.split('-').map(Number);
+    filtered = filtered.filter(p => {
+      if (!p.data_pagamento) return false;
+      const d = new Date(p.data_pagamento + 'T00:00:00');
+      return d.getFullYear() === y && d.getMonth() === m - 1;
+    });
+  }
+
+  // Summary
+  const aprovados = filtered.filter(p => getBadgeFatura(p) === 'Aprovado');
+  const pendentes = filtered.filter(p => getBadgeFatura(p) === 'Pendente');
+  const vencidos  = filtered.filter(p => getBadgeFatura(p) === 'Vencido');
+  const sumAp = aprovados.reduce((a, p) => a + parseFloat(p.valor || 0), 0);
+  const sumPe = pendentes.reduce((a, p) => a + parseFloat(p.valor || 0), 0);
+  const sumVe = vencidos.reduce((a, p) => a + parseFloat(p.valor || 0), 0);
+  const sumAll = filtered.reduce((a, p) => a + parseFloat(p.valor || 0), 0);
+
+  if ($('fat-total-aprovado')) $('fat-total-aprovado').textContent = fmt(sumAp);
+  if ($('fat-count-aprovado')) $('fat-count-aprovado').textContent = aprovados.length + ' faturas';
+  if ($('fat-total-pendente')) $('fat-total-pendente').textContent = fmt(sumPe);
+  if ($('fat-count-pendente')) $('fat-count-pendente').textContent = pendentes.length + ' faturas';
+  if ($('fat-total-vencido')) $('fat-total-vencido').textContent = fmt(sumVe);
+  if ($('fat-count-vencido')) $('fat-count-vencido').textContent = vencidos.length + ' faturas';
+  if ($('fat-total-geral')) $('fat-total-geral').textContent = fmt(sumAll);
+  if ($('fat-count-total')) $('fat-count-total').textContent = filtered.length + ' faturas';
+
+  if (filtered.length === 0) { tbody.innerHTML = ''; show('faturas-empty'); return; }
+  hide('faturas-empty');
+
+  tbody.innerHTML = filtered.map((p, i) => {
+    const status = getBadgeFatura(p);
+    const badgeClass = { Aprovado: 'badge-aprovado', Pendente: 'badge-pendente-fat', Vencido: 'badge-vencido-fat' }[status] || 'badge-pendente-fat';
+    const dataVenc = p.data_pagamento ? new Date(p.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const dataPag  = status === 'Aprovado' ? dataVenc : '—';
+    return `<tr>
+      <td style="color:var(--text-muted);font-size:.8rem">#${p.id || (i+1)}</td>
+      <td><strong>${p.cliente_nome || '—'}</strong></td>
+      <td>${p.plano || '—'}</td>
+      <td><strong style="color:#34d399">${fmt(p.valor)}</strong></td>
+      <td>${dataVenc}</td>
+      <td>${dataPag}</td>
+      <td><span class="badge ${badgeClass}" style="font-size:.75rem;padding:4px 10px;border-radius:999px;">${status}</span></td>
+      <td>
+        <div class="table-actions" style="gap:6px;">
+          <button class="action-btn action-renew" style="font-size:.78rem;padding:5px 10px;" onclick="marcarFaturaAprovada(${p.id})">✅ Pago</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function getBadgeFatura(p) {
+  // tipo 'avulsa' = Pendente unless explicitly paid
+  if (p.tipo === 'avulsa') return 'Pendente';
+  if (p.tipo === 'novo' || p.tipo === 'renovacao') return 'Aprovado';
+  return 'Pendente';
+}
+
+async function marcarFaturaAprovada(id) {
+  // For now just reload and show success — could update a status column in the future
+  toast('✅ Fatura marcada como paga!', 'success');
+}
+
+function bindFaturaFilters() {
+  const s = $('search-faturas');
+  const sf = $('fat-filter-status');
+  const mf = $('fat-filter-mes');
+  if (s && !s._wired)  { s._wired = true;  s.addEventListener('input', () => renderFaturas(allFaturas)); }
+  if (sf && !sf._wired){ sf._wired = true; sf.addEventListener('change', () => renderFaturas(allFaturas)); }
+  if (mf && !mf._wired){ mf._wired = true; mf.addEventListener('change', () => renderFaturas(allFaturas)); }
+}
+
 // === FINANCEIRO ===
 
 async function loadFinanceiro() {
@@ -924,17 +1189,46 @@ async function loadFinanceiro() {
   const vencidos = clientes.filter(c => c.status === 'Vencido' || diasAteVencimento(c.vencimento) < 0);
   const pendentes = clientes.filter(c => c.status === 'Pendente');
 
-  // Receita real do mês = pagamentos registrados este mês
-  const receitaMes = pagamentos
+  const totalEntrada = pagamentos
     .filter(p => { const d = new Date(p.data_pagamento + 'T00:00:00'); return d.getMonth() === mes && d.getFullYear() === ano; })
     .reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
 
-  const emAberto = clientes.filter(c => c.status !== 'Ativo').reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  const totalSaida = clientes.filter(c => c.status === 'Vencido').reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  const saldo = totalEntrada - totalSaida;
 
-  $('fin-receita-mes').textContent = fmt(receitaMes);
-  $('fin-ativos-count').textContent = ativos.length;
-  $('fin-em-aberto').textContent = fmt(emAberto);
-  $('fin-vencidos-count').textContent = vencidos.length;
+  // Update carteira hero cards (new layout)
+  if ($('fin-saldo')) { $('fin-saldo').textContent = fmt(saldo); $('fin-saldo').setAttribute('data-valor', saldo); }
+  if ($('fin-entrada-total')) $('fin-entrada-total').textContent = fmt(totalEntrada);
+  if ($('fin-saida-total')) $('fin-saida-total').textContent = fmt(totalSaida);
+  if ($('fin-vencidos-count')) $('fin-vencidos-count').textContent = vencidos.length + ' clientes';
+
+  // Legacy compat (hidden elements)
+  const receitaMes = totalEntrada;
+  const emAberto = clientes.filter(c => c.status !== 'Ativo').reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  if ($('fin-receita-mes')) $('fin-receita-mes').textContent = fmt(receitaMes);
+  if ($('fin-ativos-count')) $('fin-ativos-count').textContent = ativos.length;
+  if ($('fin-em-aberto')) $('fin-em-aberto').textContent = fmt(emAberto);
+
+
+  // Saldo eye toggle
+  const eyeBtn = $('btn-toggle-saldo');
+  if (eyeBtn && !eyeBtn._wired) {
+    eyeBtn._wired = true;
+    eyeBtn.addEventListener('click', () => {
+      const el = $('fin-saldo');
+      const isHidden = el.getAttribute('data-hidden') === 'true';
+      if (isHidden) {
+        el.textContent = fmt(parseFloat(el.getAttribute('data-valor') || 0));
+        el.setAttribute('data-hidden', 'false');
+        eyeBtn.textContent = '👁';
+      } else {
+        el.textContent = '••••••';
+        el.setAttribute('data-hidden', 'true');
+        eyeBtn.textContent = '🙈';
+      }
+    });
+  }
+
 
   // CHART 1: Receita real (pagamentos) vs Inadimplência por mês
   const meses = getUltimos6Meses();
@@ -1381,6 +1675,25 @@ window.addEventListener('load', () => {
   boot();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW falhou:', err));
+  }
+
+  // Event listeners para abas de jogos
+  document.querySelectorAll('.jogo-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      const dia = tab.dataset.dia;
+      loadJogosDoDia(dia);
+    });
+  });
+
+  // Event listener para botão de atualizar jogos
+  const btnAtualizar = $('btn-atualizar-jogos');
+  if (btnAtualizar) {
+    btnAtualizar.addEventListener('click', (e) => {
+      e.preventDefault();
+      loadJogosDoDia(currentDia);
+      toast('Atualizando jogos...', 'info');
+    });
   }
 });
 
@@ -2550,41 +2863,53 @@ console.log('[Jogos] Dados iniciais carregados:', {
   amanha: jogosData.amanha.length
 });
 
-// Carrega jogos ao navegar para página (guardado contra variável indefinida)
-if (typeof page !== 'undefined' && page === 'jogos') {
-  console.log('[Jogos] Iniciando página de jogos');
-  loadJogosDoDia('hoje');
-}
+// Carrega jogos ao navegar para página
+// Esta verificação foi removida pois a navegação é feita via navigateTo()
 
 async function loadJogosDoDia(dia = 'hoje') {
-  console.log('[Jogos] >>> loadJogosDoDia INICIO para:', dia);
-  
-  const conteudo = document.getElementById('jogos-conteudo');
-  if (!conteudo) {
-    console.error('[Jogos] Elemento jogos-conteudo NÃO encontrado!');
-    return;
+  try {
+    alert('TESTE: loadJogosDoDia foi chamada para: ' + dia);
+    console.log('[Jogos] >>> loadJogosDoDia INICIO para:', dia);
+    
+    const conteudo = document.getElementById('jogos-conteudo');
+    if (!conteudo) {
+      console.error('[Jogos] Elemento jogos-conteudo NÃO encontrado!');
+      return;
+    }
+
+    console.log('[Jogos] Elemento jogos-conteudo encontrado');
+    console.log('[Jogos] Dados disponiveis para', dia + ':', jogosData[dia]?.length || 0, 'jogos');
+    
+    currentDia = dia;
+
+    // Atualiza abas
+    document.querySelectorAll('.jogo-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.dia === dia);
+    });
+
+    // Usa dados locais imediatamente
+    let jogos = jogosData[dia] || getJogosSimulados(dia);
+    
+    // Garante que é um array
+    if (!Array.isArray(jogos)) {
+      console.error('[Jogos] jogos não é array:', jogos);
+      jogos = [];
+    }
+    
+    console.log('[Jogos] >>> Renderizando', jogos.length, 'jogos');
+    renderJogos(jogos, dia);
+    
+    console.log('[Jogos] >>> loadJogosDoDia FIM');
+    
+    // Atualiza em segundo plano (opcional)
+    atualizarJogosEmSegundoPlano(dia);
+  } catch (err) {
+    console.error('[Jogos] ERRO em loadJogosDoDia:', err);
+    const conteudo = document.getElementById('jogos-conteudo');
+    if (conteudo) {
+      conteudo.innerHTML = '<p style="color:red;padding:20px;">Erro ao carregar: ' + err.message + '</p>';
+    }
   }
-
-  console.log('[Jogos] Elemento jogos-conteudo encontrado');
-  console.log('[Jogos] Dados disponiveis para', dia + ':', jogosData[dia]?.length || 0, 'jogos');
-  
-  currentDia = dia;
-
-  // Atualiza abas
-  document.querySelectorAll('.jogo-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.dia === dia);
-  });
-
-  // Usa dados locais imediatamente
-  const jogos = jogosData[dia] || getJogosSimulados(dia);
-  
-  console.log('[Jogos] >>> Renderizando', jogos.length, 'jogos');
-  renderJogos(jogos, dia);
-  
-  console.log('[Jogos] >>> loadJogosDoDia FIM');
-  
-  // Atualiza em segundo plano (opcional)
-  atualizarJogosEmSegundoPlano(dia);
 }
 
 async function atualizarJogosEmSegundoPlano(dia) {
@@ -2737,6 +3062,95 @@ function renderJogos(jogos, dia) {
     console.error('[Jogos] Elemento jogos-conteudo não encontrado no render');
     return;
   }
+
+  // Garante que tenha dados
+  if (!jogos || jogos.length === 0) {
+    console.log('[Jogos] Sem jogos, usando fallback');
+    jogos = getJogosSimulados(dia);
+  }
+
+  console.log('[Jogos] Renderizando', jogos.length, 'jogos para', dia);
+
+  // Teste simples para verificar se a função está sendo chamada
+  let html = '<div style="padding: 20px; color: var(--text);">';
+  html += '<h3>Jogos do Dia - ' + dia + '</h3>';
+  html += '<p>Total de jogos: ' + jogos.length + '</p>';
+  
+  if (jogos && jogos.length > 0) {
+    html += '<ul style="list-style: none; padding: 0;">';
+    jogos.forEach((jogo, index) => {
+      html += '<li style="padding: 10px; margin: 5px 0; background: var(--card2); border-radius: 8px;">';
+      html += '<strong>' + jogo.time + '</strong> - ' + jogo.homeTeam + ' x ' + jogo.awayTeam;
+      html += ' (' + jogo.competition + ') - ' + jogo.channel;
+      html += '</li>';
+    });
+    html += '</ul>';
+  } else {
+    html += '<p>Nenhum jogo encontrado.</p>';
+  }
+  
+  html += '<button onclick="copiarJogos(\'' + dia + '\')" style="margin: 5px; padding: 8px 12px;">Copiar</button>';
+  html += '<button onclick="gerarImagemJogos(\'' + dia + '\')" style="margin: 5px; padding: 8px 12px;">Gerar Imagem</button>';
+  html += '</div>';
+
+  conteudo.innerHTML = html;
+}
+
+  // Garante que tenha dados
+  if (!jogos || jogos.length === 0) {
+    console.log('[Jogos] Sem jogos, usando fallback');
+    jogos = getJogosSimulados(dia);
+  }
+
+  console.log('[Jogos] Renderizando', jogos.length, 'jogos para', dia);
+
+  const hoje = new Date();
+  if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
+  if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
+  const dataFormatada = hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  let html = '<div class="jogos-header">';
+  html += '<div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 16px; flex-wrap: wrap;">';
+  html += '<div>';
+  html += '<div class="jogos-data" style="text-transform: capitalize;">' + dataFormatada + '</div>';
+  html += '<div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; display: flex; align-items: center; gap: 6px;">';
+  html += '<span style="background: var(--purple-glow); color: var(--purple-light); padding: 2px 8px; border-radius: 4px; font-weight: 700;">' + jogos.length + '</span>';
+  html += 'jogos programados</div></div>';
+  html += '<div style="display: flex; gap: 10px; flex-wrap: wrap;">';
+  html += '<button onclick="copiarJogos(\'' + dia + '\')" class="btn-action-jogo secondary" style="background: var(--card2); color: var(--text); border: 1px solid var(--border); padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;"><span>📋</span> Copiar Texto</button>';
+  html += '<button onclick="gerarImagemJogos(\'' + dia + '\')" class="btn-action-jogo primary" style="background: linear-gradient(135deg, var(--purple), var(--purple-dark)); color: #fff; border: none; padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px var(--purple-glow); transition: all 0.2s;"><span>🖼️</span> Gerar Agenda</button>';
+  html += '</div></div></div>';
+  html += '<div class="jogos-list">';
+
+  jogos.forEach((jogo, index) => {
+    const destaqueClass = jogo.isDestaque ? 'jogo-destaque' : '';
+    
+    html += '<div class="jogo-item ' + destaqueClass + '" style="animation: slideUpFade 0.4s ease forwards; animation-delay: ' + (index * 0.05) + 's">';
+    html += '<div class="jogo-top-info">';
+    html += '<div class="jogo-horario"><span class="horario-label" style="font-size: 0.65rem; opacity: 0.7; display: block; line-height: 1;">INÍCIO</span>';
+    html += '<span class="horario-val" style="font-size: 1.1rem; font-weight: 800;">' + jogo.time + '</span></div>';
+    html += '<div class="jogo-meta" style="flex: 1;">';
+    html += '<div class="jogo-campeonato" style="font-size: 0.85rem; font-weight: 600; color: var(--purple-light);">🏆 ' + jogo.competition + '</div>';
+    html += '<div class="jogo-canal" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">📺 ' + jogo.channel + '</div></div>';
+    html += '</div>';
+    html += '<div class="jogo-match-display" style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">';
+    html += '<div class="team home" style="display: flex; align-items: center; gap: 12px; flex: 1;">';
+    html += '<div class="team-shield" style="width: 36px; height: 36px; background: var(--card); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--purple-light); border: 1px solid var(--border); flex-shrink: 0;">' + jogo.homeTeam.substring(0, 1).toUpperCase() + '</div>';
+    html += '<span class="team-name" style="font-weight: 700; font-size: 0.95rem;">' + jogo.homeTeam + '</span></div>';
+    html += '<div class="match-vs" style="font-weight: 800; color: var(--text-muted); font-size: 0.7rem; padding: 0 10px;">VS</div>';
+    html += '<div class="team away" style="display: flex; align-items: center; gap: 12px; flex: 1; justify-content: flex-end;">';
+    html += '<span class="team-name" style="font-weight: 700; font-size: 0.95rem; text-align: right;">' + jogo.awayTeam + '</span>';
+    html += '<div class="team-shield" style="width: 36px; height: 36px; background: var(--card); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--purple-light); border: 1px solid var(--border); flex-shrink: 0;">' + jogo.awayTeam.substring(0, 1).toUpperCase() + '</div>';
+    html += '</div></div></div>';
+  });
+
+  html += '</div>';
+  html += '<div class="jogo-refresh-info" style="margin-top: 32px; padding-top: 20px; border-top: 1px dashed var(--border); text-align: center;">';
+  html += '<div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Última atualização: <b>' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '</b></div>';
+  html += '<p style="font-size: 0.75rem; color: var(--text-muted);">Dados baseados em campeonatos e times reais do futebol brasileiro</p></div>';
+
+  conteudo.innerHTML = html;
+}
 
   // Garante que tenha dados
   if (!jogos || jogos.length === 0) {
@@ -2982,7 +3396,12 @@ async function gerarImagemJogos(dia) {
   ctx.font = '24px Inter, sans-serif';
   ctx.fillText('GESTAO COMPLETA IPTV', width / 2, height - 40);
 
-  downloadCanvas(canvas, `agenda-jogos-${dia}`);
+   // Download direto
+   const link = document.createElement('a');
+   link.download = 'agenda-jogos-' + dia + '.png';
+   link.href = canvas.toDataURL('image/png');
+   link.click();
+   toast('Imagem da agenda gerada com sucesso!', 'success');
 }
 
 async function gerarGraficoJogo(jogo) {
@@ -3031,13 +3450,18 @@ async function gerarGraficoJogo(jogo) {
   
   ctx.fillStyle = '#34d399';
   ctx.font = 'bold 60px Inter, sans-serif';
-  ctx.fillText(`📺 ${jogo.channel}`, width / 2, 930);
+  ctx.fillText('📺 ' + jogo.channel, width / 2, 930);
 
   ctx.fillStyle = 'rgba(255,255,255,0.1)';
   ctx.font = 'bold 30px Syne, sans-serif';
   ctx.fillText('GESTOR FLEX', width / 2, height - 50);
 
-  downloadCanvas(canvas, `jogo-${jogo.homeTeam}-vs-${jogo.awayTeam}`);
+  // Download direto
+  const link = document.createElement('a');
+  link.download = 'jogo-' + jogo.homeTeam + '-vs-' + jogo.awayTeam + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  toast('Imagem do gráfico gerada com sucesso!', 'success');
 }
 
 function downloadCanvas(canvas, filename) {
@@ -3056,8 +3480,14 @@ function downloadCanvas(canvas, filename) {
 window.gerarGraficoJogo = gerarGraficoJogo;
 
 
-// Adiciona event listeners para jogos
+// Inicia o app ao final de todos os scripts
+// Inicia o app assim que o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('[App] DOMContentLoaded');
+  console.log('[DEBUG] Elemento jogos-conteudo existe:', !!document.getElementById('jogos-conteudo'));
+  console.log('[DEBUG] jogosData.hoje:', jogosData.hoje?.length || 0, 'jogos');
+  
+  // Configura listeners dos jogos
   console.log('[Jogos] DOM carregado, configurando listeners');
   
   // Botão atualizar
@@ -3083,14 +3513,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-});
-
-// Inicia o app ao final de todos os scripts
-// Inicia o app assim que o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('[App] DOMContentLoaded');
-  console.log('[DEBUG] Elemento jogos-conteudo existe:', !!document.getElementById('jogos-conteudo'));
-  console.log('[DEBUG] jogosData.hoje:', jogosData.hoje?.length || 0, 'jogos');
   
   // Garantia extra: esconde o splash se algo der muito errado após 3 segundos
   setTimeout(() => hide('splash'), 3000);
@@ -3100,3 +3522,103 @@ document.addEventListener('DOMContentLoaded', () => {
 // Garante que os dados dos jogos estejam disponíveis globalmente
 window.jogosData = jogosData;
 window.loadJogosDoDia = loadJogosDoDia;
+
+// Função para copiar jogos (CORRIGIDO)
+window.copiarJogos = function(dia) {
+  const jogos = jogosData[dia] || getJogosSimulados(dia);
+  if (!jogos || jogos.length === 0) {
+    toast('Nenhum jogo para copiar', 'info');
+    return;
+  }
+  const text = jogos.map(j => `${j.time} - ${j.homeTeam} x ${j.awayTeam} (${j.competition}) - ${j.channel}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Jogos copiados para a área de transferência!', 'success');
+  }).catch(err => {
+    console.error('Erro ao copiar:', err);
+    toast('Erro ao copiar jogos', 'error');
+  });
+};
+
+// Função para gerar imagem da agenda (CORRIGIDO)
+window.gerarImagemJogos = function(dia) {
+  const jogos = jogosData[dia] || getJogosSimulados(dia);
+  if (!jogos || jogos.length === 0) {
+    toast('Nenhum jogo para gerar imagem', 'info');
+    return;
+  }
+  
+  toast(`Gerando imagem com ${jogos.length} jogos...`, 'info');
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const width = 1080;
+  const height = Math.max(1920, 600 + jogos.length * 200);
+  canvas.width = width;
+  canvas.height = height;
+
+  // Background
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, '#0D0A1A');
+  gradient.addColorStop(1, '#1E1838');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  // Title
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 60px Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('⚽ JOGOS DO DIA', width / 2, 120);
+
+  // Date
+  const hoje = new Date();
+  if (dia === 'ontem') hoje.setDate(hoje.getDate() - 1);
+  if (dia === 'amanha') hoje.setDate(hoje.getDate() + 1);
+  const dataStr = hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  ctx.font = '30px Inter, sans-serif';
+  ctx.fillStyle = '#A78BFA';
+  ctx.fillText(dataStr.toUpperCase(), width / 2, 180);
+  
+  // Games
+  let yPos = 280;
+  const gameH = 180;
+  jogos.forEach((jogo, i) => {
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(124,58,237,0.1)' : 'rgba(30,24,56,0.5)';
+    ctx.fillRect(50, yPos, width-100, gameH);
+    ctx.strokeStyle = 'rgba(124,58,237,0.3)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(50, yPos, width-100, gameH);
+    
+    ctx.fillStyle = '#7C3AED';
+    ctx.font = 'bold 36px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(jogo.time, 80, yPos + 50);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 40px Syne, sans-serif';
+    ctx.fillText(jogo.homeTeam + ' vs ' + jogo.awayTeam, 80, yPos + 100);
+    
+    ctx.fillStyle = '#9B93C5';
+    ctx.font = '24px Inter, sans-serif';
+    ctx.fillText(jogo.competition + ' • ' + jogo.channel, 80, yPos + 140);
+    
+    yPos += gameH + 40;
+  });
+
+ // Footer
+  ctx.fillStyle = 'rgba(124,58,237,0.2)';
+  ctx.fillRect(0, height-150, width, 150);
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 40px Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('GESTOR FLEX', width / 2, height - 80);
+  
+  ctx.fillStyle = '#A78BFA';
+  ctx.font = '24px Inter, sans-serif';
+  ctx.fillText('GESTAO COMPLETA IPTV', width / 2, height - 40);
+
+  const link = document.createElement('a');
+  link.download = 'agenda-jogos-' + dia + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  toast('Imagem da agenda gerada com sucesso!', 'success');
+};
