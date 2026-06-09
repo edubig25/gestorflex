@@ -91,106 +91,109 @@ try {
       }
     };
 
-    // Supabase DB Polyfill
+    // Supabase DB Polyfill — totalmente compatível com await direto
     const createQueryChain = (table) => {
-      let chain = {
+      const state = {
         _table: table,
-        _action: null, // select, insert, update, delete
+        _action: null,
         _data: null,
         _eqChecks: [],
         _limit: null,
         _single: false,
         _order: null,
-        
-        select: function(cols) { this._action = 'select'; return this; },
-        insert: function(data) { this._action = 'insert'; this._data = data; return this; },
-        update: function(data) { this._action = 'update'; this._data = data; return this; },
-        delete: function() { this._action = 'delete'; return this; },
-        
-        eq: function(col, val) { this._eqChecks.push({col, val}); return this; },
-        range: function(from, to) { /* Firestore doesn't easily do offset without cursors, we just fetch all for now */ return this; },
-        limit: function(num) { this._limit = num; return this; },
-        single: function() { this._single = true; return this; },
-        order: function(col, opts) { this._order = {col, asc: opts?.ascending !== false}; return this; },
+      };
 
-        then: function(resolve, reject) {
-          this.execute().then(resolve).catch(reject);
-        },
+      const execute = async () => {
+        try {
+          const collectionRef = firestore.collection(state._table);
 
-        execute: async function() {
-          try {
-            const collectionRef = firestore.collection(this._table);
-            
-            if (this._action === 'select') {
-              let q = collectionRef;
-              for (const check of this._eqChecks) {
-                if (check.col === 'id') {
-                  const docSnap = await collectionRef.doc(check.val.toString()).get();
-                  if (docSnap.exists) {
-                    const data = { id: docSnap.id, ...docSnap.data() };
-                    return { data: this._single ? data : [data], error: null };
-                  } else {
-                    return { data: this._single ? null : [], error: null };
-                  }
+          if (state._action === 'select') {
+            let q = collectionRef;
+            for (const check of state._eqChecks) {
+              if (check.col === 'id') {
+                const docSnap = await collectionRef.doc(check.val.toString()).get();
+                if (docSnap.exists) {
+                  const data = { id: isNaN(docSnap.id) ? docSnap.id : Number(docSnap.id), ...docSnap.data() };
+                  return { data: state._single ? data : [data], error: null };
+                } else {
+                  return { data: state._single ? null : [], error: null };
                 }
-                q = q.where(check.col, '==', check.val);
               }
-              if (this._order) q = q.orderBy(this._order.col, this._order.asc ? 'asc' : 'desc');
-              if (this._limit) q = q.limit(this._limit);
-              
-              const snap = await q.get();
-              const docs = snap.docs.map(d => ({ id: isNaN(d.id) ? d.id : Number(d.id), ...d.data() }));
-              return { data: this._single ? (docs[0] || null) : docs, error: null };
+              q = q.where(check.col, '==', check.val);
             }
-            
-            if (this._action === 'insert') {
-              const dataArray = Array.isArray(this._data) ? this._data : [this._data];
-              const batch = firestore.batch();
-              const inserted = [];
-              for (const item of dataArray) {
-                let docRef;
-                if (item.id) docRef = collectionRef.doc(item.id.toString());
-                else docRef = collectionRef.doc();
-                const toSave = { ...item };
-                if (toSave.id) delete toSave.id; // optionally keep it in payload or not
-                toSave.created_at = toSave.created_at || new Date().toISOString();
-                batch.set(docRef, toSave);
-                inserted.push({ id: docRef.id, ...toSave });
-              }
-              await batch.commit();
-              return { data: this._single ? inserted[0] : inserted, error: null };
-            }
-            
-            if (this._action === 'update' || this._action === 'delete') {
-              // Usually updates/deletes use .eq('id', val)
-              const idCheck = this._eqChecks.find(c => c.col === 'id' || c.col === 'auth_id');
-              if (!idCheck) throw new Error("Update/Delete without ID not fully supported in polyfill");
-              
-              let docRef;
-              if (idCheck.col === 'id') {
-                docRef = collectionRef.doc(idCheck.val.toString());
-              } else {
-                // Must query first
-                const snap = await collectionRef.where(idCheck.col, '==', idCheck.val).get();
-                if (snap.empty) return { data: null, error: null };
-                docRef = snap.docs[0].ref;
-              }
-              
-              if (this._action === 'update') {
-                await docRef.update(this._data);
-                return { data: [this._data], error: null };
-              } else {
-                await docRef.delete();
-                return { data: null, error: null };
-              }
-            }
-            
-          } catch (error) {
-            console.error("Polyfill error:", error);
-            return { data: null, error };
+            if (state._order) q = q.orderBy(state._order.col, state._order.asc ? 'asc' : 'desc');
+            if (state._limit) q = q.limit(state._limit);
+
+            const snap = await q.get();
+            const docs = snap.docs.map(d => ({ id: isNaN(d.id) ? d.id : Number(d.id), ...d.data() }));
+            return { data: state._single ? (docs[0] || null) : docs, error: null };
           }
+
+          if (state._action === 'insert') {
+            const dataArray = Array.isArray(state._data) ? state._data : [state._data];
+            const batch = firestore.batch();
+            const inserted = [];
+            for (const item of dataArray) {
+              let docRef;
+              if (item.id) docRef = collectionRef.doc(item.id.toString());
+              else docRef = collectionRef.doc();
+              const toSave = { ...item };
+              delete toSave.id;
+              toSave.created_at = toSave.created_at || new Date().toISOString();
+              batch.set(docRef, toSave);
+              inserted.push({ id: docRef.id, ...toSave });
+            }
+            await batch.commit();
+            return { data: state._single ? inserted[0] : inserted, error: null };
+          }
+
+          if (state._action === 'update' || state._action === 'delete') {
+            const idCheck = state._eqChecks.find(c => c.col === 'id' || c.col === 'auth_id');
+            if (!idCheck) throw new Error('Update/Delete requires ID');
+
+            let docRef;
+            if (idCheck.col === 'id') {
+              docRef = collectionRef.doc(idCheck.val.toString());
+            } else {
+              const snap = await collectionRef.where(idCheck.col, '==', idCheck.val).get();
+              if (snap.empty) return { data: null, error: null };
+              docRef = snap.docs[0].ref;
+            }
+
+            if (state._action === 'update') {
+              await docRef.update(state._data);
+              return { data: [state._data], error: null };
+            } else {
+              await docRef.delete();
+              return { data: null, error: null };
+            }
+          }
+
+          return { data: null, error: new Error('No action defined') };
+        } catch (error) {
+          console.error('Polyfill error on', state._table, error);
+          return { data: null, error };
         }
       };
+
+      // Objeto thenable — suporta tanto `await chain` quanto `await chain.execute()`
+      const chain = {
+        select(cols) { state._action = 'select'; return this; },
+        insert(data) { state._action = 'insert'; state._data = data; return this; },
+        update(data) { state._action = 'update'; state._data = data; return this; },
+        delete() { state._action = 'delete'; return this; },
+        eq(col, val) { state._eqChecks.push({col, val}); return this; },
+        range(from, to) { return this; }, // Firestore não usa offset
+        limit(num) { state._limit = num; return this; },
+        single() { state._single = true; return this; },
+        order(col, opts) { state._order = {col, asc: opts?.ascending !== false}; return this; },
+        execute,
+        // Torna o objeto "await-able"
+        then(onFulfilled, onRejected) { return execute().then(onFulfilled, onRejected); },
+        catch(onRejected) { return execute().catch(onRejected); },
+        finally(onFinally) { return execute().finally(onFinally); },
+      };
+
       return chain;
     };
 
@@ -207,23 +210,74 @@ try {
 }
 // === FIM POLYFILL ===
 
-// === HELPER PARA FETCH ALL (bypassa limite 1000 do Supabase) ===
-async function fetchAll(table, select = '*', orderCol = null, orderAsc = true) {
-  let allData = [];
-  let from = 0;
-  const limit = 1000;
-  while (true) {
-    let query = db.from(table).select(select).range(from, from + limit - 1);
-    if (orderCol) query = query.order(orderCol, { ascending: orderAsc });
-    const { data, error } = await query;
-    if (error) { console.error('Error fetching', table, error); break; }
-    if (!data || data.length === 0) break;
-    allData = allData.concat(data);
-    if (data.length < limit) break;
-    from += limit;
+
+// === HELPER PARA FETCH ALL (Firestore + fallback JSON para Vercel/GitHub) ===
+// Se o Firestore estiver vazio, bloqueado por regra ou sem importação, o sistema
+// carrega os backups JSON que ficam na raiz do projeto. Isso resolve tela vazia
+// de Clientes, Planos e Pagamentos no deploy da Vercel.
+const BACKUP_FILES = {
+  clientes: 'backup_clientes.json',
+  planos: 'backup_planos.json',
+  pagamentos: 'backup_pagamentos.json'
+};
+const localBackupCache = {};
+
+async function fetchLocalBackup(table, orderCol = null, orderAsc = true) {
+  const file = BACKUP_FILES[table];
+  if (!file) return { data: [] };
+
+  try {
+    if (!localBackupCache[table]) {
+      const res = await fetch(file, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Arquivo ${file} não encontrado`);
+      const json = await res.json();
+      localBackupCache[table] = Array.isArray(json) ? json : [];
+      console.warn(`[FALLBACK] ${localBackupCache[table].length} registros carregados de ${file}`);
+    }
+
+    let data = [...localBackupCache[table]];
+    if (orderCol) {
+      data.sort((a, b) => {
+        const av = a?.[orderCol] ?? '';
+        const bv = b?.[orderCol] ?? '';
+        if (av === bv) return 0;
+        return (av > bv ? 1 : -1) * (orderAsc ? 1 : -1);
+      });
+    }
+    return { data };
+  } catch (e) {
+    console.warn(`[FALLBACK] Não foi possível carregar ${file}:`, e.message);
+    return { data: [] };
   }
-  return { data: allData };
 }
+
+async function fetchAll(table, select = '*', orderCol = null, orderAsc = true) {
+  try {
+    if (!db || !db.from) {
+      return await fetchLocalBackup(table, orderCol, orderAsc);
+    }
+
+    let query = db.from(table).select(select);
+    if (orderCol) query = query.order(orderCol, { ascending: orderAsc });
+    const result = await query.execute();
+
+    if (result.error) {
+      console.error('Error fetching', table, result.error);
+      return await fetchLocalBackup(table, orderCol, orderAsc);
+    }
+
+    const data = result.data || [];
+    // Importante: se o Firebase retornar vazio, usa os backups enviados na raiz.
+    if (data.length === 0 && BACKUP_FILES[table]) {
+      return await fetchLocalBackup(table, orderCol, orderAsc);
+    }
+    return { data };
+  } catch(e) {
+    console.error('fetchAll error for', table, e);
+    return await fetchLocalBackup(table, orderCol, orderAsc);
+  }
+}
+
 
 // === STATE ===
 let currentUser = null;
@@ -1646,7 +1700,7 @@ async function loadCaptacao() {
 
 // === PLANOS ===
 async function loadPlanos() {
-  const { data } = await db.from('planos').select('*').order('nome');
+  const { data } = await fetchAll('planos', '*', 'nome', true);
   allPlanos = data || [];
   updateSelectPlanos();
 }
