@@ -1,0 +1,35 @@
+[
+  {
+    "id": 1,
+    "cliente_id": 3,
+    "cliente_nome": "Edu",
+    "valor": 30,
+    "plano": "CLUB",
+    "tipo": "renovacao",
+    "data_pagamento": "2026-05-06",
+    "observacao": "Renovação manual — novo venc: 30/11/2026",
+    "created_at": "2026-05-06T05:59:14.617662+00:00"
+  },
+  {
+    "id": 2,
+    "cliente_id": 3,
+    "cliente_nome": "Edu",
+    "valor": 30,
+    "plano": "CLUB",
+    "tipo": "renovacao",
+    "data_pagamento": "2026-05-07",
+    "observacao": "Renovação manual — novo venc: 30/12/2026",
+    "created_at": "2026-05-07T02:53:07.529499+00:00"
+  },
+  {
+    "id": 855,
+    "cliente_id": null,
+    "cliente_nome": "Importação Cobrei VC",
+    "valor": 10740,
+    "plano": null,
+    "tipo": "manual",
+    "data_pagamento": "2026-05-14",
+    "observacao": "Ajuste inicial para igualar o Caixa Atual ao Cobrei VC",
+    "created_at": "2026-05-14T19:40:14.19213+00:00"
+  }
+]

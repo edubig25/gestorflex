@@ -1,0 +1,1066 @@
+[
+  {
+    "id": 2,
+    "nome": "CLUB",
+    "valor": 30,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-04-29T05:04:33.159544+00:00"
+  },
+  {
+    "id": 3,
+    "nome": "CLUB 30",
+    "valor": 30,
+    "custo": 8,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 4,
+    "nome": "CLUB 25",
+    "valor": 25,
+    "custo": 8,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 5,
+    "nome": "CLUB 50 BIMESTRAL",
+    "valor": 50,
+    "custo": 16,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 6,
+    "nome": "CLUB 2 TELAS 50",
+    "valor": 50,
+    "custo": 16,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 7,
+    "nome": "NOW 30",
+    "valor": 30,
+    "custo": 9,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 8,
+    "nome": "NOW 25",
+    "valor": 25,
+    "custo": 9,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 9,
+    "nome": "NOW 2 TELAS 50",
+    "valor": 50,
+    "custo": 18,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 10,
+    "nome": "NOW 50 BIMESTRAL",
+    "valor": 50,
+    "custo": 18,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 11,
+    "nome": "CLUB 60 BIMESTRAL",
+    "valor": 60,
+    "custo": 16,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 12,
+    "nome": "PLAYON IPTV 30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 13,
+    "nome": "PLAYON IPTV 35",
+    "valor": 35,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 14,
+    "nome": "PLAYON IPTV 25",
+    "valor": 25,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 15,
+    "nome": "PLAYON IPTV 2 TELAS 50",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 16,
+    "nome": "CLUB 2 TELAS 60",
+    "valor": 60,
+    "custo": 16,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 17,
+    "nome": "NOW 2 TELAS 60",
+    "valor": 60,
+    "custo": 18,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 18,
+    "nome": "PLAYON IPTV 50 BIMESTRAL",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 19,
+    "nome": "PLAYON IPTV 60 BIMESTRAL",
+    "valor": 60,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 20,
+    "nome": "CLIENTE TV IPTV 30",
+    "valor": 30,
+    "custo": 7.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 21,
+    "nome": "BEES P2P 30",
+    "valor": 30,
+    "custo": 7.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 22,
+    "nome": "CINE PLAY IPTV 30",
+    "valor": 30,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 23,
+    "nome": "CINE PLAY IPTV 25",
+    "valor": 25,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 24,
+    "nome": "CINE PLAY IPTV 35",
+    "valor": 35,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 25,
+    "nome": "CINE PLAY IPTV BIMESTRAL 50",
+    "valor": 50,
+    "custo": 12,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 26,
+    "nome": "CINE PLAY IPTV BIMESTRAL 60",
+    "valor": 60,
+    "custo": 12,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 27,
+    "nome": "CINE PLAY IPTV BIMESTRAL 70",
+    "valor": 70,
+    "custo": 12,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 28,
+    "nome": "WAREZ IPTV 30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 29,
+    "nome": "WAREZ IPTV 25",
+    "valor": 25,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 30,
+    "nome": "WAREZ IPTV 35",
+    "valor": 35,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 31,
+    "nome": "WAREZ IPTV BIMESTRAL 50",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 32,
+    "nome": "OPERA 30",
+    "valor": 30,
+    "custo": 8,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 33,
+    "nome": "NINETY 30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 34,
+    "nome": "NINETY 25",
+    "valor": 25,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 35,
+    "nome": "NOW E CLIENTE TV 60",
+    "valor": 60,
+    "custo": 16.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 36,
+    "nome": "NINETY 35",
+    "valor": 35,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 37,
+    "nome": "NINETY BIMESTRAL 50",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 38,
+    "nome": "NINETY BIMESTRAL 60",
+    "valor": 60,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 39,
+    "nome": "NINETY BIMESTRAL 70",
+    "valor": 70,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 40,
+    "nome": "CLUB E CINE PLAY 60",
+    "valor": 60,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 41,
+    "nome": "LIEBE 30",
+    "valor": 30,
+    "custo": 10,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 42,
+    "nome": "LIEBE 25",
+    "valor": 25,
+    "custo": 10,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 43,
+    "nome": "PLAYON P2P 30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 44,
+    "nome": "PLAYON P2P 35",
+    "valor": 35,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 45,
+    "nome": "PLAYON P2P 25",
+    "valor": 25,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 46,
+    "nome": "PLAYON P2P BIMESTRAL 50",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 47,
+    "nome": "PLAYON P2P BIMESTRAL 60",
+    "valor": 60,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 48,
+    "nome": "PLAYON P2P BIMESTRAL 70",
+    "valor": 70,
+    "custo": 14,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 49,
+    "nome": "FAMILY PLAY 30",
+    "valor": 30,
+    "custo": 5.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 50,
+    "nome": "BRPRO 30",
+    "valor": 30,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 51,
+    "nome": "FAMILY PLAY 25",
+    "valor": 25,
+    "custo": 5.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 52,
+    "nome": "CINE PLAY E CLUB 50",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 53,
+    "nome": "PLAYON E CLUB 50",
+    "valor": 50,
+    "custo": 15,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 54,
+    "nome": "CINE PLAY E CLUB 60",
+    "valor": 60,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 55,
+    "nome": "BEES E CLUB 50",
+    "valor": 50,
+    "custo": 15.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 56,
+    "nome": "CINE PLAY E PLAYON 50",
+    "valor": 50,
+    "custo": 13,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 57,
+    "nome": "BRPRO 25",
+    "valor": 25,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 58,
+    "nome": "BRPRO 35",
+    "valor": 35,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 59,
+    "nome": "NINETY E NOW 50",
+    "valor": 50,
+    "custo": 16,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 60,
+    "nome": "PRIME 30",
+    "valor": 30,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 61,
+    "nome": "CLUB E PLAYON",
+    "valor": 50,
+    "custo": 15,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 62,
+    "nome": "CINE PLAY E PLAYON",
+    "valor": 50,
+    "custo": 13,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 63,
+    "nome": "CLUB E DROID ALTERNATIVO 50",
+    "valor": 50,
+    "custo": 13,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 64,
+    "nome": "NOW E NINETY 50",
+    "valor": 50,
+    "custo": 16,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 65,
+    "nome": "CLUB E PRIME",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 66,
+    "nome": "NOW E CLUB 50",
+    "valor": 50,
+    "custo": 17,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 67,
+    "nome": "NOW 35",
+    "valor": 35,
+    "custo": 9,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 68,
+    "nome": "CINE PLAY E WAREZ 50",
+    "valor": 50,
+    "custo": 13,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 69,
+    "nome": "CLUB E CINE PLAY",
+    "valor": 60,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 70,
+    "nome": "WAREZ E NOW",
+    "valor": 50,
+    "custo": 15.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 71,
+    "nome": "NOW E BTV",
+    "valor": 50,
+    "custo": 16.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 72,
+    "nome": "CLUB 35",
+    "valor": 35,
+    "custo": 8,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 73,
+    "nome": "CLUB E CINE PLAY",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 74,
+    "nome": "LIVE 30",
+    "valor": 30,
+    "custo": 10,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 75,
+    "nome": "CLUB 2 TELAS R$60",
+    "valor": 60,
+    "custo": 16,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 76,
+    "nome": "PLAYON / NOW / FAMILY PLAY",
+    "valor": 75,
+    "custo": 21.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 77,
+    "nome": "PRIME 25",
+    "valor": 25,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 78,
+    "nome": "DROID 25",
+    "valor": 25,
+    "custo": 5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 79,
+    "nome": "POWER 30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 80,
+    "nome": "CINE PLAY 2 ACESSOS 50",
+    "valor": 50,
+    "custo": 12,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 81,
+    "nome": "NOW E FAMILY PLAY",
+    "valor": 75,
+    "custo": 14.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 82,
+    "nome": "CINE PLAY 2 TELAS 60",
+    "valor": 60,
+    "custo": 12,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 83,
+    "nome": "WAREZ 2 ACESSOS R$50",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 84,
+    "nome": "NOW E FPLAY 80",
+    "valor": 80,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 85,
+    "nome": "BEES, CLUB E FPLAY 80",
+    "valor": 80,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 86,
+    "nome": "Family Play 20",
+    "valor": 20,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 87,
+    "nome": "CINE PLAY 2 TELAS R$50",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 88,
+    "nome": "LIVE E POWER 50",
+    "valor": 50,
+    "custo": 17,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 89,
+    "nome": "PLAYON E POWER 50",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 90,
+    "nome": "NOW R$35",
+    "valor": 35,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 91,
+    "nome": "POWER E NOW R$50",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 92,
+    "nome": "Warez 60",
+    "valor": 60,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 93,
+    "nome": "TVS P2P R$30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 94,
+    "nome": "TVS IPTV R$30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 95,
+    "nome": "TVS DUAS TELAS R$50",
+    "valor": 50,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 96,
+    "nome": "NINETY E POWER 50",
+    "valor": 50,
+    "custo": 13,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 97,
+    "nome": "FIVE R$30",
+    "valor": 30,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 98,
+    "nome": "BLADE R$30",
+    "valor": 30,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 99,
+    "nome": "ELITE R$35",
+    "valor": 35,
+    "custo": 13,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 100,
+    "nome": "CLUB E ELITE R$60",
+    "valor": 60,
+    "custo": 21,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 101,
+    "nome": "NINETY E FIVE R$60",
+    "valor": 60,
+    "custo": 14,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 102,
+    "nome": "CINE PLAY E FIVE R$50",
+    "valor": 50,
+    "custo": 12.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.379033+00:00"
+  },
+  {
+    "id": 103,
+    "nome": "BLADE 2 ACESSOS R$50",
+    "valor": 50,
+    "custo": 11,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 104,
+    "nome": "DROID R$20",
+    "valor": 20,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 105,
+    "nome": "POWER R$25",
+    "valor": 25,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 106,
+    "nome": "FIVE R$25",
+    "valor": 25,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 107,
+    "nome": "ELITE R$50",
+    "valor": 50,
+    "custo": 19.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 108,
+    "nome": "YOUCINE R$30",
+    "valor": 30,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 109,
+    "nome": "NOW E POWER R$50",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 110,
+    "nome": "FAST R$30",
+    "valor": 30,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 111,
+    "nome": "FAST 6 MESES 120",
+    "valor": 120,
+    "custo": 0,
+    "periodicidade": "Semestral",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 112,
+    "nome": "CTV IPTV E POWER",
+    "valor": 60,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 113,
+    "nome": "OPERA E CLUB",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 114,
+    "nome": "TVS E BLADE R$60",
+    "valor": 60,
+    "custo": 12.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 115,
+    "nome": "EASY 30",
+    "valor": 30,
+    "custo": 6,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 116,
+    "nome": "FAST E NOW R$50",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 117,
+    "nome": "P2SPEED R$30",
+    "valor": 30,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 118,
+    "nome": "POWER R$35",
+    "valor": 35,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 119,
+    "nome": "GENIAL PLAY R$30",
+    "valor": 30,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 120,
+    "nome": "MYPLAY R$30",
+    "valor": 30,
+    "custo": 5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 121,
+    "nome": "BROTHERS R$30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 122,
+    "nome": "NOW,P2S,FV",
+    "valor": 80,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 123,
+    "nome": "NOW E PW",
+    "valor": 50,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 124,
+    "nome": "EPIC R$20",
+    "valor": 20,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 125,
+    "nome": "EXPIRADO",
+    "valor": 20,
+    "custo": 0,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 126,
+    "nome": "BROTHERS 30",
+    "valor": 30,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 127,
+    "nome": "E3PLAY 30",
+    "valor": 30,
+    "custo": 5.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 128,
+    "nome": "RUSH PLAY 30",
+    "valor": 30,
+    "custo": 6.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 129,
+    "nome": "PLAY TV 30",
+    "valor": 30,
+    "custo": 3,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 130,
+    "nome": "P2CINE",
+    "valor": 30,
+    "custo": 3.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 131,
+    "nome": "THE BEST",
+    "valor": 30,
+    "custo": 8,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 132,
+    "nome": "SPARK 30",
+    "valor": 30,
+    "custo": 7,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 133,
+    "nome": "FIVE BIMESTRAL 50",
+    "valor": 50,
+    "custo": 13,
+    "periodicidade": "Bimestral",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  },
+  {
+    "id": 134,
+    "nome": "UFO PLAY 30",
+    "valor": 30,
+    "custo": 4.5,
+    "periodicidade": "Mensal",
+    "created_at": "2026-05-14T17:50:20.815359+00:00"
+  }
+]
