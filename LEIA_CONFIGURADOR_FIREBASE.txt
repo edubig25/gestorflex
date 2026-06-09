@@ -1,0 +1,16 @@
+COMO ACESSAR
+
+Depois de subir esse pacote no GitHub e a Vercel publicar, abra um destes links:
+
+https://gestorflex-zeta.vercel.app/config.html
+ou
+https://gestorflex-zeta.vercel.app/configurar_firebase_vercel.html
+
+Se der 404:
+1) Confirme que o arquivo está na RAIZ do repositório, não dentro de uma pasta.
+2) Confirme que a Vercel fez redeploy.
+3) Abra primeiro /config.html porque o nome é menor.
+
+Depois de configurar, apague esses arquivos do GitHub:
+- config.html
+- configurar_firebase_vercel.html

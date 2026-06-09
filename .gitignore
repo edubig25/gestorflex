@@ -1,4 +1,5 @@
-# Não subir chave privada do Firebase
+
+# Firebase Service Account - NÃO subir
 serviceAccountKey.json
-*.service-account.json
 firebase-adminsdk*.json
+*.service-account.json
