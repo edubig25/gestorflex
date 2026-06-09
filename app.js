@@ -79,6 +79,15 @@ try {
         } catch (error) {
           return { error };
         }
+      },
+      signInWithGoogle: async () => {
+        try {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          const cred = await auth.signInWithPopup(provider);
+          return { data: { user: { id: cred.user.uid, email: cred.user.email, displayName: cred.user.displayName } }, error: null };
+        } catch (error) {
+          return { data: null, error };
+        }
       }
     };
 
@@ -554,7 +563,52 @@ $('login-form').addEventListener('submit', async e => {
   }
 });
 
-// === 2FA LOGIN VERIFICATION ===
+// === GOOGLE LOGIN HANDLER ===
+async function handleGoogleSignIn() {
+  if (!db) { toast('Banco de dados não disponível.', 'error'); return; }
+  
+  const { data: authData, error: authErr } = await db.auth.signInWithGoogle();
+  if (authErr) {
+    toast('Erro ao entrar com Google: ' + (authErr.message || authErr.code), 'error');
+    return;
+  }
+
+  const firebaseUser = authData.user;
+  
+  // Verifica se já existe um perfil de usuário no Firestore
+  const { data: customUser } = await db.from('usuarios').select('*').eq('auth_id', firebaseUser.id).single();
+  
+  if (customUser) {
+    // Usuário já tem perfil — faz login normal
+    finishLogin({ ...firebaseUser, ...customUser });
+  } else {
+    // Primeiro acesso via Google — cria o perfil automaticamente
+    const nome = firebaseUser.displayName || firebaseUser.email.split('@')[0];
+    const usuario = firebaseUser.email.split('@')[0];
+    
+    const { data: inserted, error: dbErr } = await db.from('usuarios').insert({
+      auth_id: firebaseUser.id,
+      nome: nome,
+      usuario: usuario,
+      email: firebaseUser.email
+    });
+    
+    if (dbErr) {
+      toast('Erro ao criar perfil: ' + dbErr.message, 'error');
+      return;
+    }
+
+    const newUser = inserted?.[0] || { auth_id: firebaseUser.id, nome, usuario, email: firebaseUser.email };
+    finishLogin({ ...firebaseUser, ...newUser });
+    toast('Bem-vindo, ' + nome + '! Conta criada com Google.', 'success');
+  }
+}
+
+// Botões do Google nas telas de login e setup
+document.getElementById('btn-google-login')?.addEventListener('click', handleGoogleSignIn);
+document.getElementById('btn-google-setup')?.addEventListener('click', handleGoogleSignIn);
+
+
 $('twofa-form').addEventListener('submit', e => {
   e.preventDefault();
   const code = $('twofa-code').value.trim();
