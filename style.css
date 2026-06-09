@@ -34,7 +34,14 @@ input,select,textarea{font-family:'Inter',sans-serif;outline:none}
 .logo-icon.small{font-size:22px}
 .logo-text{font-size:1.5rem;font-weight:800;letter-spacing:-.5px;color:var(--text)}
 .logo-accent{color:var(--purple-light)}
-.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.auth-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px}
+
+
+.brand-logo{display:block;object-fit:contain;filter:drop-shadow(0 0 18px rgba(124,58,237,.5));}
+.splash-brand-logo{width:min(360px,78vw);height:auto;margin:0 auto;}
+.auth-brand-logo{width:210px;max-width:100%;height:auto;margin:0 auto 6px;}
+.brand-icon{width:34px;height:34px;border-radius:10px;object-fit:cover;filter:drop-shadow(0 0 12px var(--purple));box-shadow:0 0 18px rgba(124,58,237,.25);}
+.sidebar-header{gap:10px;}
 
 /* === AUTH SCREENS === */
 .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at top right, rgba(124,58,237,0.15), transparent 50%), radial-gradient(circle at bottom left, rgba(16,185,129,0.1), transparent 50%), var(--bg);padding:24px; position:relative; overflow:hidden;}
