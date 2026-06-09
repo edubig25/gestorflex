@@ -1,8 +1,10 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron-monitor-dns",
-      "schedule": "* * * * *"
+  "functions": {
+    "api/cron-monitor-dns.js": {
+      "maxDuration": 60
+    },
+    "api/check-domain.js": {
+      "maxDuration": 30
     }
-  ]
+  }
 }

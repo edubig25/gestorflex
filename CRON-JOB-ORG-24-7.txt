@@ -1,0 +1,101 @@
+GESTOR FLEX — MONITORAMENTO DNS 24/7 NO PLANO GRÁTIS DA VERCEL
+
+Seu domínio:
+https://gestorflex-zeta.vercel.app
+
+COMO FUNCIONA
+
+A Vercel hospeda a API:
+https://gestorflex-zeta.vercel.app/api/cron-monitor-dns
+
+O cron-job.org chama essa URL a cada 1 minuto.
+A API busca SOMENTE os domínios cadastrados na aba Monitoramento de DNS / Domínios.
+Depois alterna os verificadores e salva o resultado no Firebase.
+
+ARQUIVOS IMPORTANTES
+
+api/check-domain.js
+- Faz o teste do domínio.
+
+api/cron-monitor-dns.js
+- Executa a rotina 24/7.
+- Lê a coleção dominios_monitoramento.
+- Salva histórico em monitoramentos_dns.
+
+vercel.json
+- Nesta versão NÃO agenda cron interno da Vercel.
+- Isso evita problema no plano gratuito/Hobby.
+
+VARIÁVEL OBRIGATÓRIA NA VERCEL
+
+FIREBASE_SERVICE_ACCOUNT_BASE64
+
+Sem essa variável, o cron externo até chama a API, mas a API não consegue salvar no Firebase de forma segura.
+
+Como gerar:
+1. Entre no Firebase Console.
+2. Vá em Configurações do projeto.
+3. Vá em Contas de serviço.
+4. Clique em Gerar nova chave privada.
+5. Baixe o JSON.
+6. Converta o JSON para base64.
+
+Windows PowerShell, dentro da pasta do JSON:
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("serviceAccountKey.json"))
+
+macOS/Linux:
+base64 -w 0 serviceAccountKey.json
+
+Depois coloque o resultado em:
+Vercel > Project > Settings > Environment Variables
+Nome: FIREBASE_SERVICE_ACCOUNT_BASE64
+Valor: resultado em base64
+Ambientes: Production, Preview e Development se quiser
+
+SEGURANÇA OPCIONAL, RECOMENDADA
+
+Crie também a variável:
+CRON_SECRET
+
+Exemplo de valor:
+gestorflex_24h_2026_seguro
+
+Se configurar CRON_SECRET, a URL do cron-job.org precisa ficar assim:
+https://gestorflex-zeta.vercel.app/api/cron-monitor-dns?secret=gestorflex_24h_2026_seguro
+
+Se NÃO configurar CRON_SECRET, use:
+https://gestorflex-zeta.vercel.app/api/cron-monitor-dns
+
+CONFIGURAR NO CRON-JOB.ORG
+
+1. Crie conta em https://cron-job.org
+2. Clique em Create cronjob.
+3. Title: Gestor Flex Monitor DNS
+4. URL: use uma das URLs acima.
+5. Schedule: Every minute / a cada 1 minuto.
+6. Method: GET.
+7. Timeout: 60 seconds.
+8. Salve e ative.
+
+TESTE
+
+Abra no navegador:
+https://gestorflex-zeta.vercel.app/api/cron-monitor-dns
+
+Se usar secret:
+https://gestorflex-zeta.vercel.app/api/cron-monitor-dns?secret=SEU_SECRET
+
+Resposta esperada:
+{
+  "ok": true,
+  "mode": "24/7_cron",
+  "source_collection": "dominios_monitoramento",
+  "history_collection": "monitoramentos_dns"
+}
+
+IMPORTANTE
+
+- Não suba serviceAccountKey.json para o GitHub.
+- Cadastre os domínios somente na aba Monitoramento.
+- O cron monitora somente a coleção dominios_monitoramento.
+- DNS dos servidores IPTV não entram automaticamente, a menos que você cadastre também na aba de monitoramento.
