@@ -1,0 +1,4 @@
+# Não subir chave privada do Firebase
+serviceAccountKey.json
+*.service-account.json
+firebase-adminsdk*.json

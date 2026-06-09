@@ -1,0 +1,18 @@
+FACILITADOR FIREBASE -> VERCEL
+
+Suba estes arquivos na raiz do GitHub:
+- configurar_firebase_vercel.html
+- .gitignore
+
+Depois abra:
+https://gestorflex-zeta.vercel.app/configurar_firebase_vercel.html
+
+O que ele faz:
+- Você seleciona o serviceAccountKey.json no navegador.
+- Ele gera o Base64.
+- Você copia e cola na Vercel em FIREBASE_SERVICE_ACCOUNT_BASE64.
+- Depois faz redeploy e testa o endpoint.
+
+IMPORTANTE:
+- Não suba serviceAccountKey.json no GitHub.
+- Depois de configurar, apague configurar_firebase_vercel.html do GitHub.
