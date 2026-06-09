@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Importador Firebase - Gestor Flex</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #251344, #09090E 55%);
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      width: 100%;
+      max-width: 620px;
+      background: rgba(22,19,36,.9);
+      border: 1px solid rgba(124,58,237,.35);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    p { color: #c9c2dd; line-height: 1.5; }
+    label { display: block; margin-top: 14px; color: #c9c2dd; font-size: 14px; }
+    input {
+      width: 100%;
+      margin-top: 6px;
+      padding: 13px;
+      border-radius: 10px;
+      border: 1px solid rgba(124,58,237,.4);
+      background: #0f0a1f;
+      color: #fff;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px;
+      border: 0;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #7C3AED, #A78BFA);
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .log {
+      margin-top: 18px;
+      background: #080612;
+      border: 1px solid rgba(124,58,237,.25);
+      border-radius: 12px;
+      padding: 14px;
+      height: 240px;
+      overflow: auto;
+      white-space: pre-wrap;
+      color: #d8d1ef;
+      font-size: 13px;
+    }
+    .ok { color: #10B981; }
+    .warn { color: #F59E0B; }
+    .err { color: #EF4444; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>⚡ Importador Firebase</h1>
+    <p>Use essa página só uma vez para importar os backups JSON para o Firestore. Depois que terminar, apague este arquivo do GitHub.</p>
+
+    <label>E-mail do login do sistema</label>
+    <input id="email" type="email" placeholder="seu@email.com" />
+
+    <label>Senha</label>
+    <input id="senha" type="password" placeholder="Sua senha" />
+
+    <button id="btnLogin">1. Entrar no Firebase</button>
+    <button id="btnImportar" disabled>2. Importar clientes, planos e pagamentos</button>
+
+    <div id="log" class="log">Aguardando login...</div>
+  </div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCHLr5xQGqGckcLESs5I5R7nsOcqK0ZhMo",
+  authDomain: "gestor-flex-app.firebaseapp.com",
+  projectId: "gestor-flex-app",
+  storageBucket: "gestor-flex-app.firebasestorage.app",
+  messagingSenderId: "481092517076",
+  appId: "1:481092517076:web:0944fb99e65f2e86eb0f41"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const logEl = document.getElementById('log');
+const btnLogin = document.getElementById('btnLogin');
+const btnImportar = document.getElementById('btnImportar');
+
+function log(msg, type = '') {
+  const prefix = type === 'ok' ? '✅ ' : type === 'err' ? '❌ ' : type === 'warn' ? '⚠️ ' : '• ';
+  logEl.innerHTML += `\n<span class="${type}">${prefix}${msg}</span>`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function importarColecao(nomeColecao, arquivo) {
+  log(`Lendo ${arquivo}...`);
+  const res = await fetch(`./${arquivo}?v=${Date.now()}`);
+  if (!res.ok) throw new Error(`Não consegui abrir ${arquivo}. Confira se ele está na raiz do projeto.`);
+
+  const dados = await res.json();
+  if (!Array.isArray(dados)) throw new Error(`${arquivo} não é uma lista JSON válida.`);
+
+  log(`${dados.length} registros encontrados em ${arquivo}.`);
+
+  let batch = db.batch();
+  let contador = 0;
+  let total = 0;
+
+  for (const item of dados) {
+    const docId = item.id ? String(item.id) : db.collection(nomeColecao).doc().id;
+    const ref = db.collection(nomeColecao).doc(docId);
+    batch.set(ref, item, { merge: true });
+    contador++;
+    total++;
+
+    if (contador === 450) {
+      await batch.commit();
+      log(`${total} registros enviados para ${nomeColecao}...`);
+      batch = db.batch();
+      contador = 0;
+    }
+  }
+
+  if (contador > 0) await batch.commit();
+  log(`${nomeColecao}: ${total} registros importados.`, 'ok');
+}
+
+btnLogin.onclick = async () => {
+  logEl.textContent = 'Entrando...';
+  try {
+    const email = document.getElementById('email').value.trim();
+    const senha = document.getElementById('senha').value;
+    if (!email || !senha) throw new Error('Preencha e-mail e senha.');
+    await auth.signInWithEmailAndPassword(email, senha);
+    log('Login feito com sucesso.', 'ok');
+    btnImportar.disabled = false;
+  } catch (e) {
+    log(e.message, 'err');
+  }
+};
+
+btnImportar.onclick = async () => {
+  btnImportar.disabled = true;
+  log('Iniciando importação...', 'warn');
+  try {
+    await importarColecao('clientes', 'backup_clientes.json');
+    await importarColecao('planos', 'backup_planos.json');
+    await importarColecao('pagamentos', 'backup_pagamentos.json');
+    log('Importação finalizada. Agora confira no Firebase Console.', 'ok');
+    log('Depois de conferir, apague o importador_firebase.html do GitHub.', 'warn');
+  } catch (e) {
+    log(e.message, 'err');
+    btnImportar.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
