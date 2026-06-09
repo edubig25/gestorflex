@@ -1,0 +1,36 @@
+MONITORAMENTO DNS / DOMÍNIOS — GESTOR FLEX
+
+O pacote inclui 5 verificadores:
+1. Globalping — externo/global, ativo por padrão.
+2. OpenStatus Lite — função própria da Vercel, ativo por padrão.
+3. Gatus — opcional, precisa GATUS_BASE_URL.
+4. Uptime Kuma — opcional, precisa UPTIME_KUMA_BASE_URL.
+5. Prometheus Blackbox Exporter — opcional, precisa BLACKBOX_BASE_URL.
+
+Modo seguro contra limites:
+- Não verifica o mesmo DNS novamente antes de 15 minutos.
+- O botão “Verificar pendentes” testa no máximo 6 servidores por lote.
+- Usa pausa de 4,5 segundos entre cada servidor.
+- Globalping usa apenas 1 probe e 2 pacotes por verificação.
+- Gatus, Uptime Kuma e Blackbox não são chamados se não estiverem configurados.
+
+Arquivos importantes:
+- index.html
+- app.js
+- style.css
+- sw.js
+- manifest.json
+- api/check-domain.js
+
+Teste direto após deploy:
+https://SEU-DOMINIO.vercel.app/api/check-domain?target=google.com
+
+Abra o sistema uma vez com:
+https://SEU-DOMINIO.vercel.app/?v=dns2
+
+ATUALIZAÇÃO SEM VARIÁVEIS
+--------------------------
+Foi adicionado o arquivo api/monitor-config.js.
+Agora não é obrigatório cadastrar variáveis na Vercel para o monitor básico funcionar.
+Globalping + OpenStatus Lite já funcionam direto.
+Gatus, Uptime Kuma e Blackbox precisam da URL pública desses serviços, pois eles são self-hosted/externos.

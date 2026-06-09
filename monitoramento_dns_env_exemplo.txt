@@ -1,0 +1,22 @@
+# Variáveis opcionais para configurar na Vercel
+# Globalping e OpenStatus Lite já funcionam sem configurar nada.
+
+# Segurança contra limite público do Globalping
+GLOBALPING_PROBE_LIMIT=1
+GLOBALPING_PACKETS=2
+DNS_PROVIDER_TIMEOUT_MS=4500
+
+# Opcional: Gatus self-hosted
+# Exemplo: https://status.seudominio.com
+GATUS_BASE_URL=
+GATUS_API_TOKEN=
+
+# Opcional: Uptime Kuma status page pública
+# Exemplo: https://status.seudominio.com
+UPTIME_KUMA_BASE_URL=
+UPTIME_KUMA_STATUS_SLUG=default
+
+# Opcional: Prometheus Blackbox Exporter
+# Exemplo: https://blackbox.seudominio.com
+BLACKBOX_BASE_URL=
+BLACKBOX_MODULE=http_2xx

@@ -470,6 +470,40 @@ select.cobrei-input option {
   color: var(--text-muted);
   margin-top: 2px;
 }
+.caixa-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.btn-fechar-caixa {
+  background: linear-gradient(135deg, rgba(239,68,68,0.95), rgba(185,28,28,0.95));
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: .3px;
+  box-shadow: 0 10px 28px rgba(239,68,68,0.22);
+  transition: all .2s ease;
+}
+.btn-fechar-caixa:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(239,68,68,0.32);
+}
+.btn-fechar-caixa:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.caixa-fechamento-info {
+  color: var(--text-muted);
+  font-size: .78rem;
+  line-height: 1.3;
+}
 .caixa-hero-right {
   display: flex;
   flex-direction: column;
@@ -561,6 +595,8 @@ select.cobrei-input option {
 .caixa-hero-value { font-size: 1.9rem; }
 .caixa-hero-right { flex-direction: column; }
 .caixa-pill { min-width: unset; }
+.caixa-actions { align-items: flex-start; flex-direction: column; gap: 8px; }
+.btn-fechar-caixa { width: 100%; }
 }
 
 /* === DONUT CHART === */
@@ -1046,4 +1082,111 @@ select.cobrei-input option {
 }
 .btn-google:active {
   transform: scale(0.97);
+}
+
+
+/* === OPERAÇÃO IPTV === */
+.iptv-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:18px}
+.mini-muted{font-size:.78rem;color:var(--text-muted)}
+.slim-table-wrap{max-height:420px;overflow:auto}
+.creditos-list,.problem-ranking,.migration-list{display:flex;flex-direction:column;gap:10px}
+.credito-item,.problem-item,.migration-item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+.credito-main,.problem-main,.migration-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.credito-title,.problem-title,.migration-title{font-weight:800;color:var(--text)}
+.credito-sub,.problem-sub,.migration-sub{font-size:.8rem;color:var(--text-muted);white-space:normal}
+.iptv-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:rgba(124,58,237,.12);color:var(--purple-light);border-radius:999px;padding:5px 9px;font-size:.75rem;font-weight:800;white-space:nowrap}
+.iptv-pill.red{background:rgba(239,68,68,.12);color:#fca5a5;border-color:rgba(239,68,68,.28)}
+.iptv-pill.green{background:rgba(16,185,129,.12);color:#6ee7b7;border-color:rgba(16,185,129,.28)}
+.iptv-pill.yellow{background:rgba(245,158,11,.12);color:#fcd34d;border-color:rgba(245,158,11,.28)}
+.migration-toolbar{display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:14px}
+.migration-msg{background:rgba(124,58,237,.10);border:1px dashed rgba(167,139,250,.45);border-radius:14px;padding:12px 14px;color:var(--text);font-size:.88rem;margin-bottom:14px;white-space:pre-wrap}
+.form-section-title{margin:8px 0 0;padding:10px 12px;border-radius:12px;background:rgba(124,58,237,.10);color:var(--purple-light);font-weight:800;border:1px solid var(--border)}
+.mac-badge,.tech-badge{display:inline-flex;margin-left:6px;align-items:center;border-radius:999px;padding:2px 6px;font-size:.68rem;font-weight:800;background:rgba(124,58,237,.15);color:var(--purple-light);border:1px solid var(--border)}
+.tech-badge{background:rgba(16,185,129,.12);color:#6ee7b7;border-color:rgba(16,185,129,.25)}
+textarea{font-family:'Inter',sans-serif;background:rgba(13,10,26,0.85);border:1px solid rgba(124,58,237,0.3);border-radius:10px;padding:12px 14px;color:var(--text);resize:vertical;outline:none}
+textarea:focus{border-color:var(--purple-light);box-shadow:0 0 0 4px rgba(124,58,237,0.2)}
+@media(max-width:900px){.iptv-summary-grid{grid-template-columns:1fr 1fr}.iptv-grid-main,.dash-grid.iptv-grid-main{grid-template-columns:1fr!important}.migration-toolbar{grid-template-columns:1fr}.slim-table-wrap{max-height:none}}
+@media(max-width:560px){.iptv-summary-grid{grid-template-columns:1fr}}
+
+
+
+/* === MONITORAMENTO DNS / DOMÍNIOS === */
+.monitor-help{
+  margin:10px 0 14px;
+  padding:12px 14px;
+  border:1px solid rgba(124,58,237,.22);
+  background:rgba(124,58,237,.08);
+  border-radius:14px;
+  color:var(--text-muted);
+  font-size:.86rem;
+  line-height:1.45;
+}
+.monitor-help code{
+  color:var(--purple-light);
+  background:rgba(0,0,0,.25);
+  border:1px solid rgba(124,58,237,.18);
+  border-radius:8px;
+  padding:2px 6px;
+}
+.mini-muted{
+  display:block;
+  color:var(--text-muted);
+  font-size:.74rem;
+  margin-top:4px;
+  line-height:1.35;
+}
+.table-actions .action-btn:not(.action-edit):not(.action-delete){
+  background:rgba(124,58,237,.12);
+  color:var(--purple-light);
+  border:1px solid rgba(124,58,237,.25);
+}
+@media(max-width:760px){
+  #tbody-dns-monitor td:nth-child(2),
+  #tbody-dns-monitor td:nth-child(3){
+    min-width:150px;
+  }
+}
+
+/* === MONITORAMENTO DNS — TODOS OS VERIFICADORES / MODO SEGURO === */
+.monitor-config-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(120px,1fr));
+  gap:10px;
+  margin:0 0 14px;
+}
+.monitor-config-grid>div{
+  border:1px solid rgba(124,58,237,.18);
+  background:rgba(13,10,26,.55);
+  border-radius:12px;
+  padding:10px 12px;
+}
+.monitor-config-grid strong{display:block;color:var(--text);font-size:.82rem;margin-bottom:3px}
+.monitor-config-grid span{display:block;color:var(--text-muted);font-size:.72rem;line-height:1.25}
+.providers-grid{display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:6px;min-width:330px}
+.provider-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.provider-latency{font-size:.72rem;color:var(--text-muted)}
+.provider-detail{font-size:.68rem;color:var(--text-muted);display:block;width:100%;line-height:1.2}
+.iptv-pill.muted{opacity:.72;background:rgba(161,155,184,.08);color:var(--text-muted);border-color:rgba(161,155,184,.18)}
+.limit-warn{color:#fcd34d!important}
+.action-btn:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.3)}
+@media(max-width:1050px){.monitor-config-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}.providers-grid{grid-template-columns:1fr;min-width:220px}}
+@media(max-width:560px){.monitor-config-grid{grid-template-columns:1fr}.providers-grid{min-width:180px}}
+
+
+.auto-monitor-line{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:0 0 12px;
+  padding:10px 12px;
+  border:1px solid rgba(16,185,129,.18);
+  background:rgba(16,185,129,.07);
+  border-radius:12px;
+  color:var(--text-muted);
+  font-size:.82rem;
+}
+.auto-monitor-line.running{
+  border-color:rgba(16,185,129,.38);
+  color:#6ee7b7;
 }

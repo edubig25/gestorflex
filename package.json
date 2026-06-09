@@ -1,5 +1,9 @@
 {
+  "name": "gestor-flex",
+  "version": "1.0.0",
+  "private": true,
   "dependencies": {
-    "firebase": "^12.14.0"
+    "firebase": "^12.14.0",
+    "firebase-admin": "^13.4.0"
   }
 }

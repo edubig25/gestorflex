@@ -1,0 +1,29 @@
+# Opcional: exemplo para rodar verificadores open-source em um VPS/servidor próprio.
+# Não roda dentro da Vercel. Use apenas se você tiver Docker em um servidor.
+services:
+  gatus:
+    image: twinproduction/gatus:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./monitoring/gatus/config.yaml:/config/config.yaml
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+
+  blackbox:
+    image: prom/blackbox-exporter:latest
+    restart: unless-stopped
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./monitoring/blackbox/config.yml:/etc/blackbox_exporter/config.yml
+
+volumes:
+  uptime-kuma-data:

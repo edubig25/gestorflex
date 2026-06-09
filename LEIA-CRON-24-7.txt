@@ -1,0 +1,67 @@
+GESTOR FLEX — MONITORAMENTO DNS 24/7 REAL
+
+Esta versão adiciona:
+
+1) api/cron-monitor-dns.js
+   - Roda pelo Vercel Cron.
+   - Lê SOMENTE a coleção dominios_monitoramento.
+   - Ignora DNS dos servidores IPTV que não foram cadastrados na aba de monitoramento.
+   - Salva histórico em monitoramentos_dns.
+   - Atualiza status em dominios_monitoramento.
+
+2) vercel.json
+   - Agenda o cron para rodar a cada 60 segundos:
+     * * * * *
+
+3) package.json
+   - Adiciona firebase-admin para o backend conseguir salvar no Firebase com segurança.
+
+VARIÁVEL OBRIGATÓRIA NA VERCEL
+
+Para o cron gravar no Firebase, configure na Vercel:
+
+FIREBASE_SERVICE_ACCOUNT_BASE64
+
+Como gerar:
+1. Firebase Console > Configurações do projeto > Contas de serviço.
+2. Gerar nova chave privada.
+3. Baixe o JSON.
+4. Converta o JSON para base64.
+5. Cole o resultado na variável FIREBASE_SERVICE_ACCOUNT_BASE64 na Vercel.
+
+No Windows PowerShell, dentro da pasta do arquivo JSON:
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("serviceAccountKey.json"))
+
+No macOS/Linux:
+base64 -w 0 serviceAccountKey.json
+
+VARIÁVEIS OPCIONAIS
+
+CRON_SECRET
+- Protege o endpoint do cron.
+- Se você configurar, o Vercel Cron deve enviar Authorization: Bearer SEU_SEGREDO.
+
+GLOBALPING_CRON_EVERY_N_MINUTES=5
+- Por segurança, Globalping roda em média 1 vez a cada 5 minutos por domínio.
+- Os outros ciclos usam OpenStatus Lite ou verificadores self-hosted configurados.
+
+CRON_DOMAIN_DELAY_MS=1200
+- Pausa entre um domínio e outro.
+
+CRON_MAX_DOMAINS_PER_RUN=0
+- 0 = todos os domínios cadastrados.
+- Se tiver muitos domínios e a função estourar tempo, coloque 10, 20 ou 30.
+
+GATUS_BASE_URL
+UPTIME_KUMA_BASE_URL
+BLACKBOX_BASE_URL
+- Só configure se você tiver esses verificadores rodando em VPS/servidor.
+
+TESTES
+
+Depois do deploy, teste manualmente:
+https://SEU-DOMINIO.vercel.app/api/cron-monitor-dns
+
+Se retornar JSON com ok:true, está funcionando.
+
+Atenção: não suba serviceAccountKey.json para o GitHub.

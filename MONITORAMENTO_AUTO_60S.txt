@@ -1,0 +1,27 @@
+MONITORAMENTO AUTOMÁTICO DE DNS - GESTOR FLEX
+
+O que foi adicionado:
+- Botão "Auto 60s" dentro da aba Operação IPTV.
+- A cada 60 segundos, enquanto o sistema estiver aberto, ele inicia uma nova rodada.
+- A rodada verifica todos os domínios/DNS cadastrados: DNS principal e DNS reserva.
+- Os verificadores são alternados em modo round-robin:
+  1) OpenStatus Lite
+  2) Gatus
+  3) Uptime Kuma
+  4) Blackbox Exporter
+  5) Globalping
+- Se Gatus, Uptime Kuma ou Blackbox não estiverem configurados, o sistema identifica e pula nos próximos ciclos.
+- O Globalping respeita intervalo mais conservador para evitar excesso de uso.
+- Uma rodada nunca sobrepõe outra. Se tiver muitos domínios e demorar mais de 60 segundos, o próximo ciclo aguarda.
+
+Importante:
+- Esse monitor automático roda no navegador/PWA enquanto o Gestor Flex estiver aberto.
+- Para monitorar com o sistema fechado, seria necessário usar cron/backend externo.
+
+Arquivos principais alterados:
+- index.html
+- app.js
+- style.css
+- manifest.json
+- sw.js
+- api/check-domain.js

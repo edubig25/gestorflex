@@ -1,0 +1,36 @@
+CONFIGURAÇÃO SEM VARIÁVEIS NA VERCEL
+
+Agora o arquivo api/check-domain.js lê primeiro as variáveis da Vercel e, se não encontrar, lê o arquivo:
+
+api/monitor-config.js
+
+Então você pode subir os arquivos assim mesmo no GitHub sem configurar nada na Vercel.
+
+O que já funciona sem preencher nada:
+- Globalping
+- OpenStatus Lite
+
+O que precisa de serviço externo rodando:
+- Gatus
+- Uptime Kuma
+- Prometheus Blackbox Exporter
+
+Para ativar algum desses, edite api/monitor-config.js e coloque a URL pública do serviço.
+
+Exemplo:
+GATUS_BASE_URL: 'https://status.seudominio.com'
+UPTIME_KUMA_BASE_URL: 'https://status.seudominio.com'
+BLACKBOX_BASE_URL: 'https://blackbox.seudominio.com'
+
+IMPORTANTE:
+Se seu GitHub for público, não coloque token secreto no arquivo monitor-config.js.
+Nesse caso, coloque apenas URL pública, ou use as variáveis da Vercel para tokens.
+
+O arquivo docker-compose.monitoramento.yml é opcional.
+Ele serve apenas caso você queira rodar Gatus, Uptime Kuma e Blackbox em um VPS/servidor próprio.
+Ele NÃO roda dentro da Vercel.
+
+Teste após subir:
+https://seudominio.vercel.app/api/check-domain?target=google.com
+
+Se retornar JSON, a API está funcionando.

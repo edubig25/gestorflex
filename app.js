@@ -284,6 +284,17 @@ let currentUser = null;
 let allClientes = [];
 let allPlanos = [];
 let allServidores = [];
+let allProblemasIPTV = [];
+let allMonitoramentosDNS = [];
+let allDominiosMonitoramento = [];
+let dnsAutoMonitorTimer = null;
+let dnsAutoMonitorEnabled = localStorage.getItem('gf_dns_auto60_enabled') === '1';
+let dnsAutoMonitorRunning = false;
+let dnsAutoProviderIndex = Number(localStorage.getItem('gf_dns_auto_provider_index') || '0') || 0;
+let dnsAutoDisabledProviders = (() => {
+  try { return new Set(JSON.parse(localStorage.getItem('gf_dns_auto_disabled_providers') || '[]')); }
+  catch (e) { return new Set(); }
+})();
 let chartReceita = null;
 let chartFinFluxo = null;
 let chartFinStatus = null;
@@ -294,6 +305,7 @@ let deleteType = null;
 let tempLoginUser = null;
 let forgotEmailTarget = null;
 let tempSecret2FA = null;
+let ultimoCaixaSnapshot = null;
 
 
 function toast(msg, type = 'info') {
@@ -308,6 +320,56 @@ function toast(msg, type = 'info') {
 
 function fmt(val) {
   return 'R$ ' + parseFloat(val || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
+function toMoneyNumber(v) {
+  const n = parseFloat(String(v ?? 0).replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function parseDateTime(value, endOfDay = false) {
+  if (!value) return null;
+  const str = String(value);
+  const normalized = str.length <= 10 ? str.slice(0, 10) + (endOfDay ? 'T23:59:59' : 'T00:00:00') : str;
+  const d = new Date(normalized);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function recordTimestamp(item, fields = ['created_at', 'data_fechamento', 'data_pagamento']) {
+  if (!item) return 0;
+  for (const field of fields) {
+    if (item[field]) {
+      const d = parseDateTime(item[field], field === 'data_pagamento');
+      if (d) return d.getTime();
+    }
+  }
+  return 0;
+}
+
+function pagamentoTimestamp(pagamento) {
+  if (!pagamento) return 0;
+  if (pagamento.created_at) return recordTimestamp(pagamento, ['created_at']);
+  return recordTimestamp(pagamento, ['data_pagamento']);
+}
+
+function getUltimoFechamento(fechamentos = []) {
+  const lista = Array.isArray(fechamentos) ? [...fechamentos] : [];
+  return lista
+    .filter(f => recordTimestamp(f, ['created_at', 'data_fechamento']) > 0)
+    .sort((a, b) => recordTimestamp(b, ['created_at', 'data_fechamento']) - recordTimestamp(a, ['created_at', 'data_fechamento']))[0] || null;
+}
+
+function pagamentosAposFechamento(pagamentos = [], ultimoFechamento = null) {
+  const limite = recordTimestamp(ultimoFechamento, ['created_at', 'data_fechamento']);
+  const lista = Array.isArray(pagamentos) ? pagamentos : [];
+  if (!limite) return lista;
+  return lista.filter(p => pagamentoTimestamp(p) > limite);
+}
+
+function formatDateTimeBR(value) {
+  const d = parseDateTime(value);
+  if (!d) return '';
+  return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 function diasAteVencimento(dateStr) {
@@ -808,6 +870,7 @@ async function enterApp() {
     $('sidebar-nome').textContent = currentUser.nome || currentUser.email;
     $('sidebar-avatar').textContent = (currentUser.nome || currentUser.email).charAt(0).toUpperCase();
     loadPlanos();
+    loadServidores();
     loadDashboard();
     populateConfig();
     // Carrega configs do Meta Ads em segundo plano
@@ -855,13 +918,15 @@ function navigateTo(page) {
     if (isActive) console.log('[Navigation] Mostrando página:', p.id);
     p.classList.toggle('active', isActive);
   });
-const titles = { dashboard: 'Dashboard', clientes: 'Clientes', faturas: 'Faturas', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', whatsapp: 'WhatsApp', configuracoes: 'Configurações', 'meta-ads': 'Meta Ads', jogos: 'Jogos do Dia' };
+const titles = { dashboard: 'Dashboard', clientes: 'Clientes', faturas: 'Faturas', financeiro: 'Financeiro', captacao: 'Captação', planos: 'Planos', iptv: 'Operação IPTV', whatsapp: 'WhatsApp', configuracoes: 'Configurações', 'meta-ads': 'Meta Ads', jogos: 'Jogos do Dia' };
 $('topbar-title').textContent = titles[page] || '';
+if (page === 'dashboard') loadDashboard();
 if (page === 'clientes') loadClientes();
 if (page === 'faturas') loadFaturas();
 if (page === 'financeiro') loadFinanceiro();
 if (page === 'captacao') loadCaptacao();
 if (page === 'planos') loadPlanosPage();
+if (page === 'iptv') loadIPTV();
 if (page === 'whatsapp') loadWhatsApp();
 if (page === 'configuracoes') populateConfig();
 if (page === 'meta-ads') loadMetaAds();
@@ -875,62 +940,180 @@ if (page === 'jogos') {
 }
 
 $('menu-toggle').addEventListener('click', () => $('sidebar').classList.toggle('open'));
+if ($('btn-fechar-caixa')) $('btn-fechar-caixa').addEventListener('click', fecharCaixa);
 
 // === DASHBOARD ===
 async function loadDashboard() {
-  const [{ data: clientes }, { data: pagamentos }] = await Promise.all([
-    fetchAll('clientes', '*'),
-    fetchAll('pagamentos', '*')
-  ]);
-  allClientes = clientes || [];
-  renderCaixaAtual(allClientes, pagamentos || []);
-  renderDashMetrics(allClientes);
-  renderDashChartDual(allClientes, pagamentos || []);
-  renderDashDonut(allClientes);
-  renderListaVencendo(allClientes);
-  checkNotifVencendo(allClientes);
+  try {
+    console.log('[Dashboard] Carregando caixa e métricas...');
+    const [{ data: clientes }, { data: pagamentos }, { data: fechamentos }] = await Promise.all([
+      fetchAll('clientes', '*'),
+      fetchAll('pagamentos', '*'),
+      fetchAll('fechamentos_caixa', '*', 'created_at', false)
+    ]);
+
+    allClientes = Array.isArray(clientes) ? clientes : [];
+    const listaPagamentos = Array.isArray(pagamentos) ? pagamentos : [];
+    const listaFechamentos = Array.isArray(fechamentos) ? fechamentos : [];
+
+    renderCaixaAtual(allClientes, listaPagamentos, listaFechamentos);
+    renderDashMetrics(allClientes);
+    renderDashChartDual(allClientes, listaPagamentos);
+    renderDashDonut(allClientes);
+    renderListaVencendo(allClientes);
+    checkNotifVencendo(allClientes);
+
+    console.log('[Dashboard] OK:', {
+      clientes: allClientes.length,
+      pagamentos: listaPagamentos.length,
+      fechamentos: listaFechamentos.length
+    });
+  } catch (e) {
+    console.error('[Dashboard] Erro ao carregar:', e);
+    renderCaixaAtual(allClientes || [], [], []);
+    toast('Erro ao carregar o Caixa Atual. Tente atualizar a página.', 'error');
+  }
 }
 
-function renderCaixaAtual(clientes, pagamentos = []) {
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+function renderCaixaAtual(clientes, pagamentos = [], fechamentos = []) {
+  const safeClientes = Array.isArray(clientes) ? clientes : [];
+  const safePagamentos = Array.isArray(pagamentos) ? pagamentos : [];
+  const safeFechamentos = Array.isArray(fechamentos) ? fechamentos : [];
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
   const mes = hoje.getMonth();
   const ano = hoje.getFullYear();
 
-  // Caixa real: soma dos pagamentos registrados no mês atual
-  const caixaReal = pagamentos
-    .filter(p => {
-      const d = new Date(p.data_pagamento + 'T00:00:00');
-      return d.getMonth() === mes && d.getFullYear() === ano;
-    })
-    .reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
+  const statusOf = c => String(c?.status || '').trim().toLowerCase();
+  const dateFromISO = value => parseDateTime(value, false);
+  const isSameMonth = d => d && d.getMonth() === mes && d.getFullYear() === ano;
 
-  // A Receber: clientes Pendentes
-  const pendente = clientes
-    .filter(c => c.status === 'Pendente')
-    .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  const ultimoFechamento = getUltimoFechamento(safeFechamentos);
+  const pagamentosPeriodo = pagamentosAposFechamento(safePagamentos, ultimoFechamento);
 
-  // Inadimplente: clientes Vencidos no mês atual
-  const vencido = clientes
-    .filter(c => {
-      if (c.status !== 'Vencido' || !c.vencimento) return false;
-      const d = new Date(c.vencimento + 'T00:00:00');
-      return d.getMonth() === mes && d.getFullYear() === ano;
-    })
-    .reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
+  // Caixa Atual: soma apenas os pagamentos depois do último fechamento.
+  // Ao fechar o caixa, um registro é salvo em fechamentos_caixa e o saldo volta para R$ 0,00.
+  const caixaAtual = pagamentosPeriodo.reduce((acc, p) => acc + toMoneyNumber(p.valor), 0);
+  const recebidoMes = pagamentosPeriodo
+    .filter(p => isSameMonth(dateFromISO(p.data_pagamento || p.created_at)))
+    .reduce((acc, p) => acc + toMoneyNumber(p.valor), 0);
 
-  const totalPotencial = caixaReal + pendente + vencido;
-  const pct = totalPotencial > 0 ? Math.round((caixaReal / totalPotencial) * 100) : 0;
+  // A receber: prioriza clientes com status Pendente. Se não existir esse status,
+  // mostra os clientes ativos com vencimento no mês atual.
+  const pendentesStatus = safeClientes.filter(c => statusOf(c) === 'pendente');
+  const ativosDoMes = safeClientes.filter(c => statusOf(c) === 'ativo' && isSameMonth(dateFromISO(c.vencimento)));
+  const listaAReceber = pendentesStatus.length ? pendentesStatus : ativosDoMes;
+  const aReceber = listaAReceber.reduce((acc, c) => acc + toMoneyNumber(c.valor), 0);
 
-  $('caixa-valor').textContent = fmt(caixaReal);
-  $('caixa-recebido').textContent = fmt(caixaReal);
-  $('caixa-pendente').textContent = fmt(pendente);
-  $('caixa-vencido').textContent = fmt(vencido);
-  $('caixa-pct').textContent = pct + '%';
+  // Inadimplente: mostra todos os vencidos, não apenas o mês atual.
+  const inadimplente = safeClientes
+    .filter(c => statusOf(c) === 'vencido')
+    .reduce((acc, c) => acc + toMoneyNumber(c.valor), 0);
+
+  const totalClientesComStatus = safeClientes.filter(c => ['ativo', 'vencido', 'pendente'].includes(statusOf(c))).length;
+  const ativosQtd = safeClientes.filter(c => statusOf(c) === 'ativo').length;
+  const pct = totalClientesComStatus > 0 ? Math.round((ativosQtd / totalClientesComStatus) * 100) : 0;
+
+  const setText = (id, value) => { const el = $(id); if (el) el.textContent = value; };
+  setText('caixa-valor', fmt(caixaAtual));
+  setText('caixa-recebido', fmt(caixaAtual));
+  setText('caixa-pendente', fmt(aReceber));
+  setText('caixa-vencido', fmt(inadimplente));
+  setText('caixa-pct', pct + '%');
+
+  const sub = document.querySelector('.caixa-hero-sub');
+  if (sub) {
+    sub.textContent = ultimoFechamento
+      ? 'Saldo após o último fechamento de caixa'
+      : 'Saldo desde o início/última importação';
+  }
+
+  const info = $('caixa-ultimo-fechamento');
+  if (info) {
+    if (ultimoFechamento) {
+      const data = formatDateTimeBR(ultimoFechamento.created_at || ultimoFechamento.data_fechamento);
+      info.textContent = `Último fechamento: ${data} • ${fmt(ultimoFechamento.valor_fechado || 0)}`;
+    } else {
+      info.textContent = 'Nenhum fechamento realizado';
+    }
+  }
+
+  const barLabel = document.querySelector('.caixa-bar-label span:first-child');
+  if (barLabel) barLabel.textContent = 'Adimplência geral';
 
   const bar = $('caixa-bar');
   if (bar) {
     bar.style.width = '0%';
     setTimeout(() => { bar.style.width = pct + '%'; }, 120);
+  }
+
+  ultimoCaixaSnapshot = {
+    caixaAtual,
+    recebidoPeriodo: caixaAtual,
+    recebidoMes,
+    aReceber,
+    inadimplente,
+    pct,
+    totalClientes: safeClientes.length,
+    clientesAtivos: ativosQtd,
+    pagamentosPeriodo: pagamentosPeriodo.length,
+    ultimoFechamentoId: ultimoFechamento?.id || null
+  };
+}
+
+async function fecharCaixa() {
+  const snap = ultimoCaixaSnapshot || {};
+  const valor = toMoneyNumber(snap.caixaAtual);
+
+  if (valor <= 0) {
+    toast('O caixa atual já está zerado.', 'info');
+    return;
+  }
+
+  const confirmar = window.confirm(
+    `Deseja fechar o caixa no valor de ${fmt(valor)}?\n\n` +
+    'Isso vai zerar o Caixa Atual da tela inicial. Os pagamentos antigos continuam salvos no histórico.'
+  );
+  if (!confirmar) return;
+
+  const btn = $('btn-fechar-caixa');
+  const oldText = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Fechando...';
+  }
+
+  try {
+    const agora = new Date().toISOString();
+    const payload = {
+      data_fechamento: agora,
+      valor_fechado: valor,
+      recebido_periodo: toMoneyNumber(snap.recebidoPeriodo),
+      recebido_mes: toMoneyNumber(snap.recebidoMes),
+      a_receber: toMoneyNumber(snap.aReceber),
+      inadimplente: toMoneyNumber(snap.inadimplente),
+      percentual_adimplencia: snap.pct || 0,
+      total_clientes: snap.totalClientes || 0,
+      clientes_ativos: snap.clientesAtivos || 0,
+      pagamentos_periodo: snap.pagamentosPeriodo || 0,
+      responsavel: currentUser?.email || currentUser?.usuario || currentUser?.nome || null,
+      observacao: 'Fechamento manual do caixa'
+    };
+
+    const { error } = await db.from('fechamentos_caixa').insert(payload);
+    if (error) throw error;
+
+    toast('Caixa fechado com sucesso. Saldo zerado!', 'success');
+    await loadDashboard();
+    if ($('page-financeiro')?.classList.contains('active')) loadFinanceiro();
+  } catch (e) {
+    console.error('Erro ao fechar caixa:', e);
+    toast('Erro ao fechar caixa: ' + (e.message || 'tente novamente'), 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = oldText || '🔒 Fechar caixa';
+    }
   }
 }
 
@@ -1127,10 +1310,11 @@ function renderTabela(list) {
     const badgeClass = { Ativo: 'badge-ativo', Vencido: 'badge-vencido', Pendente: 'badge-pendente' }[c.status] || 'badge-pendente';
     const dataFmt = c.vencimento ? new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
     const macBadge = c.mac_address ? `<span class="mac-badge">MAC</span>` : '';
+    const techBadge = (c.servidor_id || c.usuario_iptv || c.dns_iptv) ? `<span class="tech-badge">IPTV</span>` : '';
     return `<tr>
       <td><strong>${c.nome}</strong></td>
       <td>${c.whatsapp || '—'}</td>
-      <td>${c.plano || '—'} ${macBadge}</td>
+      <td>${c.plano || '—'} ${macBadge} ${techBadge}<div style="font-size:.72rem;color:var(--text-muted);margin-top:3px">${escapeHTML(c.servidor_nome || getServidorNome(c.servidor_id) || '')}</div></td>
       <td>${fmt(c.valor)}</td>
       <td>${dataFmt}</td>
       <td><span class="badge ${badgeClass}">${c.status}</span></td>
@@ -1255,6 +1439,15 @@ function openAddModal() {
   const hoje = new Date();
   $('cl-vencimento').value = addMeses(hoje.toISOString().split('T')[0], 1);
   updateSelectPlanos();
+  updateSelectServidores();
+  if ($('cl-servidor-id')) $('cl-servidor-id').value = '';
+  if ($('cl-dns-iptv')) $('cl-dns-iptv').value = '';
+  if ($('cl-usuario-iptv')) $('cl-usuario-iptv').value = '';
+  if ($('cl-senha-iptv')) $('cl-senha-iptv').value = '';
+  if ($('cl-vencimento-painel')) $('cl-vencimento-painel').value = '';
+  if ($('cl-telas')) $('cl-telas').value = '1';
+  if ($('cl-dispositivo')) $('cl-dispositivo').value = '';
+  if ($('cl-pacote-iptv')) $('cl-pacote-iptv').value = '';
   show('modal-cliente');
 }
 
@@ -1270,6 +1463,15 @@ function openEdit(id) {
   $('cl-status').value = c.status || 'Ativo';
   $('cl-origem').value = c.origem || '';
   $('cl-app-nome').value = c.app_nome || '';
+  updateSelectServidores();
+  if ($('cl-servidor-id')) $('cl-servidor-id').value = c.servidor_id || '';
+  if ($('cl-dns-iptv')) $('cl-dns-iptv').value = c.dns_iptv || '';
+  if ($('cl-usuario-iptv')) $('cl-usuario-iptv').value = c.usuario_iptv || '';
+  if ($('cl-senha-iptv')) $('cl-senha-iptv').value = c.senha_iptv || '';
+  if ($('cl-vencimento-painel')) $('cl-vencimento-painel').value = c.vencimento_painel || '';
+  if ($('cl-telas')) $('cl-telas').value = String(c.telas || '1');
+  if ($('cl-dispositivo')) $('cl-dispositivo').value = c.dispositivo || '';
+  if ($('cl-pacote-iptv')) $('cl-pacote-iptv').value = c.pacote_iptv || '';
   $('cl-mac').value = c.mac_address || '';
   $('cl-key').value = c.app_key || '';
   if (c.mac_address || c.app_key) { $('cl-has-mac-sim').checked = true; show('mac-key-fields'); }
@@ -1305,6 +1507,15 @@ $('form-cliente').addEventListener('submit', async e => {
     status: $('cl-status').value,
     origem: $('cl-origem').value,
     app_nome: $('cl-app-nome').value.trim(),
+    servidor_id: $('cl-servidor-id') ? $('cl-servidor-id').value : '',
+    servidor_nome: getServidorNome($('cl-servidor-id') ? $('cl-servidor-id').value : ''),
+    dns_iptv: $('cl-dns-iptv') ? $('cl-dns-iptv').value.trim() : '',
+    usuario_iptv: $('cl-usuario-iptv') ? $('cl-usuario-iptv').value.trim() : '',
+    senha_iptv: $('cl-senha-iptv') ? $('cl-senha-iptv').value.trim() : '',
+    vencimento_painel: $('cl-vencimento-painel') ? $('cl-vencimento-painel').value : '',
+    telas: $('cl-telas') ? parseInt($('cl-telas').value || '1', 10) : 1,
+    dispositivo: $('cl-dispositivo') ? $('cl-dispositivo').value : '',
+    pacote_iptv: $('cl-pacote-iptv') ? $('cl-pacote-iptv').value.trim() : '',
     mac_address: hasMac ? $('cl-mac').value.trim() : null,
     app_key: hasMac ? $('cl-key').value.trim() : null
   };
@@ -1475,12 +1686,16 @@ function bindFaturaFilters() {
 // === FINANCEIRO ===
 
 async function loadFinanceiro() {
-  const [{ data: clientesData }, { data: pagamentosData }] = await Promise.all([
+  const [{ data: clientesData }, { data: pagamentosData }, { data: fechamentosData }] = await Promise.all([
     fetchAll('clientes', '*'),
-    fetchAll('pagamentos', '*', 'data_pagamento', false)
+    fetchAll('pagamentos', '*', 'data_pagamento', false),
+    fetchAll('fechamentos_caixa', '*', 'created_at', false)
   ]);
   const clientes = clientesData || [];
   const pagamentos = pagamentosData || [];
+  const fechamentos = fechamentosData || [];
+  const ultimoFechamento = getUltimoFechamento(fechamentos);
+  const pagamentosCaixa = pagamentosAposFechamento(pagamentos, ultimoFechamento);
 
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const mes = hoje.getMonth(); const ano = hoje.getFullYear();
@@ -1489,12 +1704,10 @@ async function loadFinanceiro() {
   const vencidos = clientes.filter(c => c.status === 'Vencido' || diasAteVencimento(c.vencimento) < 0);
   const pendentes = clientes.filter(c => c.status === 'Pendente');
 
-  const totalEntrada = pagamentos
-    .filter(p => { const d = new Date(p.data_pagamento + 'T00:00:00'); return d.getMonth() === mes && d.getFullYear() === ano; })
-    .reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
+  const totalEntrada = pagamentosCaixa.reduce((acc, p) => acc + parseFloat(p.valor || 0), 0);
 
   const totalSaida = clientes.filter(c => c.status === 'Vencido').reduce((acc, c) => acc + parseFloat(c.valor || 0), 0);
-  const saldo = totalEntrada - totalSaida;
+  const saldo = totalEntrada;
 
   // Update carteira hero cards (new layout)
   if ($('fin-saldo')) { $('fin-saldo').textContent = fmt(saldo); $('fin-saldo').setAttribute('data-valor', saldo); }
@@ -1821,6 +2034,1038 @@ $('confirm-delete').addEventListener('click', async () => {
   if (deleteType === 'cliente') { loadClientes(); loadDashboard(); }
   else { loadPlanosPage(); }
   deleteTargetId = null; deleteType = null;
+});
+
+
+// === OPERAÇÃO IPTV ===
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+}
+
+function getServidorNome(id) {
+  if (!id) return '';
+  const servidor = allServidores.find(s => String(s.id) === String(id));
+  return servidor?.nome || '';
+}
+
+function getServidorById(id) {
+  return allServidores.find(s => String(s.id) === String(id)) || null;
+}
+
+async function loadServidores() {
+  const { data } = await fetchAll('servidores_iptv', '*', 'nome', true);
+  allServidores = Array.isArray(data) ? data : [];
+  updateSelectServidores();
+  return allServidores;
+}
+
+function updateSelectServidores() {
+  const opts = '<option value="">Sem servidor</option>' + allServidores.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.nome || 'Servidor')}</option>`).join('');
+  ['cl-servidor-id', 'mig-origem', 'mig-destino', 'prob-servidor'].forEach(id => {
+    const sel = $(id);
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = opts;
+    sel.value = current;
+  });
+}
+
+function updateProblemaClienteSelect() {
+  const sel = $('prob-cliente');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Sem cliente específico</option>' + allClientes
+    .slice()
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || '')))
+    .map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.nome || 'Cliente')} — ${escapeHTML(c.whatsapp || '')}</option>`)
+    .join('');
+  sel.value = current;
+}
+
+function getClientesDoServidor(clientes, servidorId) {
+  if (!servidorId) return clientes.filter(c => !c.servidor_id && !c.servidor_nome);
+  return clientes.filter(c => String(c.servidor_id || '') === String(servidorId));
+}
+
+async function loadIPTV() {
+  try {
+    const [{ data: clientes }, { data: servidores }, { data: problemas }, { data: monitoramentos }, { data: dominiosMonitoramento }] = await Promise.all([
+      fetchAll('clientes', '*'),
+      fetchAll('servidores_iptv', '*', 'nome', true),
+      fetchAll('problemas_iptv', '*', 'created_at', false),
+      fetchAll('monitoramentos_dns', '*', 'checked_at', false),
+      fetchAll('dominios_monitoramento', '*', 'nome', true)
+    ]);
+    allClientes = Array.isArray(clientes) ? clientes : [];
+    allServidores = Array.isArray(servidores) ? servidores : [];
+    allProblemasIPTV = Array.isArray(problemas) ? problemas : [];
+    allMonitoramentosDNS = Array.isArray(monitoramentos) ? monitoramentos : [];
+    allDominiosMonitoramento = Array.isArray(dominiosMonitoramento) ? dominiosMonitoramento : [];
+    updateSelectServidores();
+    updateProblemaClienteSelect();
+    renderIPTVResumo();
+    renderIPTVAuditoria();
+    renderIPTVServidores();
+    renderIPTVCreditos();
+    renderIPTVProblemasRanking();
+    renderDNSMonitoramento();
+    renderMigracaoList();
+  } catch (e) {
+    console.error('Erro ao carregar Operação IPTV:', e);
+    toast('Erro ao carregar Operação IPTV.', 'error');
+  }
+}
+
+function clienteTemFichaTecnica(c) {
+  return !!(c.servidor_id || c.servidor_nome || c.app_nome || c.usuario_iptv || c.senha_iptv || c.dns_iptv || c.mac_address || c.app_key || c.dispositivo || c.vencimento_painel);
+}
+
+function getDivergenciasCliente(c) {
+  const divergencias = [];
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const status = String(c.status || '').toLowerCase();
+  const vencGestor = parseDateTime(c.vencimento, false);
+  const vencPainel = parseDateTime(c.vencimento_painel, false);
+  const missing = [];
+  if (!c.servidor_id && !c.servidor_nome) missing.push('servidor');
+  if (!c.app_nome) missing.push('app');
+  if (!c.usuario_iptv && !c.mac_address) missing.push('usuário/MAC');
+  if (!c.senha_iptv && !c.app_key) missing.push('senha/KEY');
+  if (!c.vencimento_painel) missing.push('vencimento no painel');
+  if (missing.length) {
+    divergencias.push({ tipo: 'Ficha incompleta', detalhe: 'Falta: ' + missing.join(', ') });
+  }
+  if (vencPainel && status === 'ativo' && vencPainel < hoje) {
+    divergencias.push({ tipo: 'Ativo no Gestor, vencido no painel', detalhe: 'Painel venceu em ' + vencPainel.toLocaleDateString('pt-BR') });
+  }
+  if (vencPainel && status === 'vencido' && vencPainel >= hoje) {
+    divergencias.push({ tipo: 'Vencido no Gestor, ativo no painel', detalhe: 'Painel liberado até ' + vencPainel.toLocaleDateString('pt-BR') });
+  }
+  if (vencGestor && vencPainel) {
+    const diffDias = Math.round(Math.abs(vencGestor.getTime() - vencPainel.getTime()) / 86400000);
+    if (diffDias > 1) {
+      divergencias.push({ tipo: 'Vencimento diferente', detalhe: `Gestor: ${vencGestor.toLocaleDateString('pt-BR')} • Painel: ${vencPainel.toLocaleDateString('pt-BR')}` });
+    }
+  }
+  return divergencias;
+}
+
+function renderIPTVResumo() {
+  const fichas = allClientes.filter(clienteTemFichaTecnica).length;
+  const divergencias = allClientes.reduce((acc, c) => acc + getDivergenciasCliente(c).length, 0);
+  const creditos30 = calcularCreditos30Dias().total;
+  const setText = (id, value) => { const el = $(id); if (el) el.textContent = value; };
+  setText('iptv-total-servidores', allServidores.length);
+  setText('iptv-fichas', `${fichas}/${allClientes.length}`);
+  setText('iptv-pendencias', divergencias);
+  setText('iptv-creditos-30', creditos30);
+}
+
+function renderIPTVAuditoria() {
+  const tbody = $('tbody-iptv-auditoria');
+  if (!tbody) return;
+  const rows = [];
+  for (const c of allClientes) {
+    for (const d of getDivergenciasCliente(c)) {
+      rows.push({ cliente: c, ...d });
+    }
+  }
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    show('iptv-auditoria-empty');
+    return;
+  }
+  hide('iptv-auditoria-empty');
+  tbody.innerHTML = rows.slice(0, 80).map(row => `<tr>
+    <td><strong>${escapeHTML(row.cliente.nome || 'Cliente')}</strong><div style="font-size:.72rem;color:var(--text-muted)">${escapeHTML(row.cliente.whatsapp || '')}</div></td>
+    <td><span class="iptv-pill ${row.tipo.includes('vencido') || row.tipo.includes('Vencido') ? 'red' : 'yellow'}">${escapeHTML(row.tipo)}</span></td>
+    <td>${escapeHTML(row.detalhe)}</td>
+    <td><button class="action-btn action-edit" onclick="openEdit(${JSON.stringify(row.cliente.id)})">Corrigir</button></td>
+  </tr>`).join('');
+}
+
+function servidorStats(servidor) {
+  const clientes = getClientesDoServidor(allClientes, servidor.id);
+  const ativos = clientes.filter(c => c.status === 'Ativo').length;
+  const vencidos = clientes.filter(c => c.status === 'Vencido').length;
+  const receita = clientes.filter(c => c.status === 'Ativo').reduce((acc, c) => acc + toMoneyNumber(c.valor), 0);
+  const custoCredito = toMoneyNumber(servidor.custo_credito);
+  const custo = ativos * custoCredito;
+  return { total: clientes.length, ativos, vencidos, receita, custo, lucro: receita - custo };
+}
+
+function renderIPTVServidores() {
+  const tbody = $('tbody-servidores-iptv');
+  if (!tbody) return;
+  if (!allServidores.length) {
+    tbody.innerHTML = '';
+    show('servidores-empty');
+    return;
+  }
+  hide('servidores-empty');
+  tbody.innerHTML = allServidores.map(s => {
+    const st = servidorStats(s);
+    const status = s.status || 'Online';
+    const cls = status === 'Online' ? 'green' : status === 'Offline' ? 'red' : 'yellow';
+    return `<tr>
+      <td><strong>${escapeHTML(s.nome || 'Servidor')}</strong><div style="font-size:.72rem;color:var(--text-muted);max-width:230px;overflow:hidden;text-overflow:ellipsis">${escapeHTML(s.dns || '')}</div></td>
+      <td>${st.ativos} ativos / ${st.total} total<div style="font-size:.72rem;color:var(--text-muted)">Lucro estimado: ${fmt(st.lucro)}</div></td>
+      <td>${parseInt(s.creditos_disponiveis || 0, 10)} disp.<div style="font-size:.72rem;color:var(--text-muted)">Custo: ${fmt(s.custo_credito || 0)}</div></td>
+      <td><span class="iptv-pill ${cls}">${escapeHTML(status)}</span></td>
+      <td><div class="table-actions"><button class="action-btn action-edit" onclick="openEditServidor('${escapeHTML(s.id)}')">Editar</button><button class="action-btn action-delete" onclick="deleteServidorIPTV('${escapeHTML(s.id)}')">Excluir</button></div></td>
+    </tr>`;
+  }).join('');
+}
+
+
+function normalizeMonitorTarget(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  try {
+    const normalized = value.match(/^https?:\/\//i) ? value : 'http://' + value;
+    const url = new URL(normalized);
+    return url.hostname || value.replace(/^https?:\/\//i, '').split('/')[0];
+  } catch (e) {
+    return value.replace(/^https?:\/\//i, '').split('/')[0].trim();
+  }
+}
+
+function formatMonitorDate(value) {
+  if (!value) return 'Nunca';
+  const d = parseDateTime(value, true) || new Date(value);
+  if (!d || isNaN(d.getTime())) return 'Nunca';
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function monitorClass(status) {
+  const st = String(status || '').toLowerCase();
+  if (st.includes('online')) return 'green';
+  if (st.includes('instável') || st.includes('degraded') || st.includes('lento')) return 'yellow';
+  if (st.includes('offline') || st.includes('erro') || st.includes('falha')) return 'red';
+  return 'yellow';
+}
+
+function monitorLabel(status) {
+  const st = String(status || '').toLowerCase();
+  if (st === 'online') return 'Online';
+  if (st === 'degraded') return 'Instável';
+  if (st === 'offline') return 'Offline';
+  if (!status) return 'Sem teste';
+  return String(status);
+}
+
+function getLatestMonitorDNS(servidorId, tipo = 'principal') {
+  return allMonitoramentosDNS
+    .filter(m => String(m.servidor_id) === String(servidorId) && String(m.tipo_dns || 'principal') === String(tipo))
+    .sort((a, b) => new Date(b.checked_at || b.created_at || 0) - new Date(a.checked_at || a.created_at || 0))[0] || null;
+}
+
+function getLatestProviderMonitorDNS(servidorId, tipo = 'principal', provider = 'openstatus_lite') {
+  const meta = DNS_PROVIDER_META[provider];
+  if (!meta) return null;
+  return allMonitoramentosDNS
+    .filter(m => {
+      const status = String(m[meta.statusKey] || '').toLowerCase();
+      return String(m.servidor_id) === String(servidorId)
+        && String(m.tipo_dns || 'principal') === String(tipo)
+        && status
+        && status !== 'skipped';
+    })
+    .sort((a, b) => new Date(b.checked_at || b.created_at || 0) - new Date(a.checked_at || a.created_at || 0))[0] || null;
+}
+
+function minutesUntilNextDNSProviderCheck(servidorId, tipo, provider) {
+  const latest = getLatestProviderMonitorDNS(servidorId, tipo, provider);
+  if (!latest?.checked_at) return 0;
+  const d = parseDateTime(latest.checked_at, true) || new Date(latest.checked_at);
+  if (!d || isNaN(d.getTime())) return 0;
+  const minMs = DNS_PROVIDER_MIN_INTERVAL_MS[provider] || DNS_AUTO_INTERVAL_MS;
+  const elapsed = Date.now() - d.getTime();
+  const wait = minMs - elapsed;
+  return wait > 0 ? Math.ceil(wait / 60000) : 0;
+}
+
+function normalizeDominioAtivo(value) {
+  return !(value === false || value === 'false' || value === 0 || value === '0' || String(value || '').toLowerCase() === 'inativo');
+}
+
+function monitorDomainKey(id) {
+  return 'monitor:' + String(id);
+}
+
+function getDominiosMonitoramentoAtivos() {
+  return allDominiosMonitoramento
+    .filter(d => normalizeDominioAtivo(d.ativo) && (d.target || d.dominio || d.url))
+    .sort((a, b) => String(a.nome || a.target || '').localeCompare(String(b.nome || b.target || '')));
+}
+
+function getAutoDNSTargets() {
+  return getDominiosMonitoramentoAtivos().map(dominio => ({ dominio }));
+}
+
+function setAutoDNSStatus(text, running = false) {
+  const el = $('auto-dns-monitor-status');
+  if (el) el.textContent = text;
+  const wrap = el?.closest?.('.auto-monitor-line');
+  if (wrap) wrap.classList.toggle('running', !!running);
+}
+
+function updateAutoDNSButton() {
+  const btn = $('btn-auto-dns-monitor');
+  if (!btn) return;
+  btn.textContent = dnsAutoMonitorEnabled ? '⏸️ Parar Auto 60s' : '▶️ Auto 60s';
+  btn.classList.toggle('btn-primary', dnsAutoMonitorEnabled);
+  btn.classList.toggle('btn-secondary', !dnsAutoMonitorEnabled);
+  if (!dnsAutoMonitorEnabled) setAutoDNSStatus('Auto 60s desligado.');
+}
+
+function saveAutoDisabledProviders() {
+  localStorage.setItem('gf_dns_auto_disabled_providers', JSON.stringify(Array.from(dnsAutoDisabledProviders)));
+}
+
+function markAutoProviderDisabled(provider) {
+  if (!provider || provider === 'openstatus_lite' || provider === 'globalping') return;
+  dnsAutoDisabledProviders.add(provider);
+  saveAutoDisabledProviders();
+}
+
+function getNextAutoProvider(targets = []) {
+  for (let i = 0; i < DNS_AUTO_PROVIDERS.length; i++) {
+    const provider = DNS_AUTO_PROVIDERS[dnsAutoProviderIndex % DNS_AUTO_PROVIDERS.length];
+    dnsAutoProviderIndex = (dnsAutoProviderIndex + 1) % DNS_AUTO_PROVIDERS.length;
+    localStorage.setItem('gf_dns_auto_provider_index', String(dnsAutoProviderIndex));
+    if (dnsAutoDisabledProviders.has(provider)) continue;
+    if (targets.length) {
+      const temAlgumLiberado = targets.some(item => !minutesUntilNextDNSProviderCheck(monitorDomainKey(item.dominio.id), 'monitor', provider));
+      if (!temAlgumLiberado) continue;
+    }
+    return provider;
+  }
+  return 'openstatus_lite';
+}
+
+async function executarAutoDNSMonitor() {
+  if (!dnsAutoMonitorEnabled || dnsAutoMonitorRunning) return;
+  dnsAutoMonitorRunning = true;
+  try {
+    if (!allDominiosMonitoramento.length) await loadIPTV();
+    const targets = getAutoDNSTargets();
+    if (!targets.length) {
+      setAutoDNSStatus('Auto 60s ligado, mas nenhum domínio foi cadastrado na aba Monitoramento.', false);
+      return;
+    }
+    const provider = getNextAutoProvider(targets);
+    const meta = DNS_PROVIDER_META[provider] || { label: provider };
+    setAutoDNSStatus(`Auto 60s: verificando ${targets.length} domínio(s) cadastrados com ${meta.label}...`, true);
+    let feitos = 0;
+    let pulados = 0;
+    let totalCheckedCount = 0;
+    for (const item of targets) {
+      if (!dnsAutoMonitorEnabled) break;
+      const wait = minutesUntilNextDNSProviderCheck(monitorDomainKey(item.dominio.id), 'monitor', provider);
+      if (wait) { pulados++; continue; }
+      const ok = await verificarDominioMonitoramento(item.dominio.id, {
+        auto: true,
+        batch: true,
+        silent: true,
+        force: true,
+        noReload: true,
+        providers: [provider]
+      });
+      totalCheckedCount += Number(verificarDominioMonitoramento.lastCheckedCount || 0);
+      if (ok) feitos++;
+      else pulados++;
+      await new Promise(r => setTimeout(r, DNS_AUTO_BATCH_DELAY_MS));
+    }
+    await loadIPTV();
+    if (totalCheckedCount === 0) markAutoProviderDisabled(provider);
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const extra = totalCheckedCount === 0 && provider !== 'openstatus_lite' && provider !== 'globalping' ? ' • verificador opcional sem configuração, pulado nos próximos ciclos' : '';
+    setAutoDNSStatus(`Auto 60s ligado • Último ciclo ${hora}: ${meta.label} • ${feitos} verificado(s), ${pulados} pulado(s).${extra}`, false);
+  } catch (e) {
+    console.error('Auto monitor DNS erro:', e);
+    setAutoDNSStatus('Auto 60s ligado, mas houve erro: ' + (e.message || e), false);
+  } finally {
+    dnsAutoMonitorRunning = false;
+  }
+}
+
+function startAutoDNSMonitor() {
+  dnsAutoMonitorEnabled = true;
+  localStorage.setItem('gf_dns_auto60_enabled', '1');
+  if (dnsAutoMonitorTimer) clearInterval(dnsAutoMonitorTimer);
+  updateAutoDNSButton();
+  executarAutoDNSMonitor();
+  dnsAutoMonitorTimer = setInterval(executarAutoDNSMonitor, DNS_AUTO_INTERVAL_MS);
+}
+
+function stopAutoDNSMonitor() {
+  dnsAutoMonitorEnabled = false;
+  localStorage.setItem('gf_dns_auto60_enabled', '0');
+  if (dnsAutoMonitorTimer) clearInterval(dnsAutoMonitorTimer);
+  dnsAutoMonitorTimer = null;
+  updateAutoDNSButton();
+}
+
+function toggleAutoDNSMonitor() {
+  if (dnsAutoMonitorEnabled) stopAutoDNSMonitor();
+  else startAutoDNSMonitor();
+}
+
+
+const DNS_MONITOR_MIN_INTERVAL_MS = 15 * 60 * 1000;
+const DNS_MONITOR_BATCH_MAX = 6;
+const DNS_MONITOR_BATCH_DELAY_MS = 4500;
+const DNS_AUTO_INTERVAL_MS = 60 * 1000;
+const DNS_AUTO_BATCH_DELAY_MS = 2500;
+const DNS_AUTO_PROVIDERS = ['openstatus_lite', 'gatus', 'uptime_kuma', 'blackbox', 'globalping'];
+const DNS_PROVIDER_MIN_INTERVAL_MS = {
+  openstatus_lite: 60 * 1000,
+  gatus: 60 * 1000,
+  uptime_kuma: 60 * 1000,
+  blackbox: 60 * 1000,
+  globalping: 15 * 60 * 1000
+};
+
+const DNS_PROVIDER_META = {
+  globalping: { label: 'Globalping', statusKey: 'globalping_status', latencyKey: 'globalping_latency_ms', detailKey: 'globalping_detalhe' },
+  openstatus_lite: { label: 'OpenStatus Lite', statusKey: 'openstatus_status', latencyKey: 'openstatus_latency_ms', detailKey: 'openstatus_detalhe' },
+  gatus: { label: 'Gatus', statusKey: 'gatus_status', latencyKey: 'gatus_latency_ms', detailKey: 'gatus_detalhe' },
+  uptime_kuma: { label: 'Uptime Kuma', statusKey: 'uptime_kuma_status', latencyKey: 'uptime_kuma_latency_ms', detailKey: 'uptime_kuma_detalhe' },
+  blackbox: { label: 'Blackbox', statusKey: 'blackbox_status', latencyKey: 'blackbox_latency_ms', detailKey: 'blackbox_detalhe' }
+};
+
+function minutesUntilNextDNSCheck(latest) {
+  if (!latest?.checked_at) return 0;
+  const d = parseDateTime(latest.checked_at, true) || new Date(latest.checked_at);
+  if (!d || isNaN(d.getTime())) return 0;
+  const elapsed = Date.now() - d.getTime();
+  const wait = DNS_MONITOR_MIN_INTERVAL_MS - elapsed;
+  return wait > 0 ? Math.ceil(wait / 60000) : 0;
+}
+
+function providerStatusLine(latest, provider) {
+  if (!latest) return '<span class="mini-muted">Sem teste</span>';
+  const meta = DNS_PROVIDER_META[provider];
+  if (!meta) return '<span class="mini-muted">—</span>';
+  const status = latest[meta.statusKey];
+  const latency = latest[meta.latencyKey];
+  const detailKey = meta.detailKey || (provider + '_detalhe');
+  const detail = latest[detailKey] || '';
+  const skipped = String(status || '').toLowerCase() === 'skipped';
+  const unknown = String(status || '').toLowerCase() === 'unknown';
+  return `<div class="provider-line">
+    <span class="iptv-pill ${monitorClass(status)} ${skipped ? 'muted' : ''}">${escapeHTML(meta.label)}: ${escapeHTML(skipped ? 'Não configurado' : monitorLabel(status))}</span>
+    ${latency ? `<span class="provider-latency">${Math.round(latency)} ms</span>` : ''}
+    ${detail && (skipped || unknown) ? `<span class="provider-detail">${escapeHTML(detail).slice(0, 80)}</span>` : ''}
+  </div>`;
+}
+
+function providersResumo(latest) {
+  const providers = ['globalping', 'openstatus_lite', 'gatus', 'uptime_kuma', 'blackbox'];
+  if (!latest) return '<span class="mini-muted">Sem verificação ainda.</span>';
+  return `<div class="providers-grid">${providers.map(p => providerStatusLine(latest, p)).join('')}</div>`;
+}
+
+function getDominioMonitoramentoById(id) {
+  return allDominiosMonitoramento.find(d => String(d.id) === String(id)) || null;
+}
+
+function getLatestMonitorDominio(dominioId) {
+  return getLatestMonitorDNS(monitorDomainKey(dominioId), 'monitor');
+}
+
+function openAddDominioMonitoramento() {
+  const title = $('modal-dominio-monitor-titulo');
+  if (title) title.textContent = 'Cadastrar domínio no monitoramento';
+  if ($('form-dominio-monitor')) $('form-dominio-monitor').reset();
+  if ($('dm-id')) $('dm-id').value = '';
+  if ($('dm-ativo')) $('dm-ativo').value = 'true';
+  if ($('dm-servidor')) updateSelectDominioServidor();
+  hide('dominio-monitor-error');
+  show('modal-dominio-monitor');
+}
+
+function openEditDominioMonitoramento(id) {
+  const d = getDominioMonitoramentoById(id);
+  if (!d) return;
+  const title = $('modal-dominio-monitor-titulo');
+  if (title) title.textContent = 'Editar domínio monitorado';
+  updateSelectDominioServidor();
+  $('dm-id').value = d.id || '';
+  $('dm-nome').value = d.nome || '';
+  $('dm-target').value = d.target || d.dominio || d.url || '';
+  $('dm-tipo').value = d.tipo || 'DNS principal';
+  $('dm-servidor').value = d.servidor_id || '';
+  $('dm-ativo').value = normalizeDominioAtivo(d.ativo) ? 'true' : 'false';
+  $('dm-observacao').value = d.observacao || '';
+  hide('dominio-monitor-error');
+  show('modal-dominio-monitor');
+}
+
+function updateSelectDominioServidor() {
+  const sel = $('dm-servidor');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Não vincular</option>' + allServidores.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.nome || 'Servidor')}</option>`).join('');
+  sel.value = current;
+}
+
+async function deleteDominioMonitoramento(id) {
+  const d = getDominioMonitoramentoById(id);
+  if (!d) return;
+  if (!confirm(`Excluir o domínio ${d.nome || d.target || 'selecionado'} do monitoramento?\nOs históricos antigos não serão apagados.`)) return;
+  const { error } = await db.from('dominios_monitoramento').delete().eq('id', id);
+  if (error) { toast('Erro ao excluir domínio monitorado.', 'error'); return; }
+  toast('Domínio removido do monitoramento.', 'success');
+  await loadIPTV();
+}
+
+function renderDNSMonitoramento() {
+  const tbody = $('tbody-dns-monitor');
+  const empty = $('dns-monitor-empty');
+  if (!tbody) return;
+
+  const dominios = getDominiosMonitoramentoAtivos();
+  if (!dominios.length) {
+    tbody.innerHTML = '';
+    if (empty) show('dns-monitor-empty');
+    return;
+  }
+
+  if (empty) hide('dns-monitor-empty');
+  tbody.innerHTML = dominios.map(d => {
+    const latest = getLatestMonitorDominio(d.id);
+    const target = d.target || d.dominio || d.url || '';
+    const servidor = d.servidor_id ? getServidorById(d.servidor_id) : null;
+    const statusFinal = latest?.status || d.monitor_status || 'Sem teste';
+    const latency = latest?.latency_ms || d.monitor_latency_ms || '';
+    const waitMin = minutesUntilNextDNSCheck(latest);
+    return `<tr>
+      <td>
+        <strong>${escapeHTML(d.nome || target || 'Domínio')}</strong>
+        <div class="mini-muted">Domínio: ${escapeHTML(target || 'não informado')}</div>
+        <div class="mini-muted">Tipo: ${escapeHTML(d.tipo || 'Monitoramento')} ${servidor ? '• Servidor: ' + escapeHTML(servidor.nome || '') : ''}</div>
+      </td>
+      <td>${providersResumo(latest)}</td>
+      <td>
+        <span class="iptv-pill ${monitorClass(statusFinal)}">${escapeHTML(monitorLabel(statusFinal))}</span>
+        ${latency ? `<div class="mini-muted">Latência média: ${Math.round(latency)} ms</div>` : ''}
+        <div class="mini-muted">Último teste: ${formatMonitorDate(latest?.checked_at || d.monitor_ultima_verificacao)}</div>
+        ${waitMin ? `<div class="mini-muted limit-warn">Seguro: aguarde ${waitMin} min para novo teste.</div>` : ''}
+      </td>
+      <td>
+        <div class="table-actions">
+          <button class="action-btn action-edit" onclick="verificarDominioMonitoramento('${escapeHTML(d.id)}')" ${waitMin ? 'disabled title="Verificação recente: modo seguro evita excesso de requisições"' : ''}>Verificar</button>
+          <button class="action-btn" onclick="openEditDominioMonitoramento('${escapeHTML(d.id)}')">Editar</button>
+          <button class="action-btn action-delete" onclick="deleteDominioMonitoramento('${escapeHTML(d.id)}')">Excluir</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function providerDetail(providerPayload) {
+  if (!providerPayload) return '';
+  if (providerPayload.error) return String(providerPayload.error).slice(0, 180);
+  if (providerPayload.endpoint) return String(providerPayload.endpoint).slice(0, 180);
+  if (providerPayload.http_status) return 'HTTP ' + providerPayload.http_status;
+  return '';
+}
+
+
+async function verificarDominioMonitoramento(dominioId, options = {}) {
+  verificarDominioMonitoramento.lastCheckedCount = 0;
+  const dominio = getDominioMonitoramentoById(dominioId);
+  if (!dominio) return false;
+  const target = dominio.target || dominio.dominio || dominio.url;
+  if (!target) {
+    if (!options.silent) toast('Esse item não tem domínio/URL cadastrada.', 'error');
+    return false;
+  }
+
+  const requestedProviders = Array.isArray(options.providers) && options.providers.length
+    ? options.providers
+    : ['globalping', 'openstatus_lite', 'gatus', 'uptime_kuma', 'blackbox'];
+
+  const monitorKey = monitorDomainKey(dominio.id);
+  const latest = getLatestMonitorDNS(monitorKey, 'monitor');
+  const waitMin = minutesUntilNextDNSCheck(latest);
+  if (waitMin && !options.force && !options.auto) {
+    if (!options.silent) toast(`Esse domínio já foi verificado recentemente. Aguarde ${waitMin} min para não extrapolar limite.`, 'info');
+    return false;
+  }
+
+  const btnTodos = $('btn-verificar-todos-dns');
+  if (btnTodos && !options.batch) btnTodos.disabled = true;
+  if (!options.silent) {
+    const nomes = requestedProviders.map(p => DNS_PROVIDER_META[p]?.label || p).join(', ');
+    toast(`Verificando ${dominio.nome || target} com ${nomes}...`, 'info');
+  }
+
+  try {
+    const providersParam = requestedProviders.join(',');
+    const url = `/api/check-domain?target=${encodeURIComponent(target)}&servidor=${encodeURIComponent(dominio.nome || '')}&providers=${encodeURIComponent(providersParam)}`;
+    const res = await fetch(url);
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error) throw new Error(payload.error || 'Falha ao verificar domínio.');
+
+    verificarDominioMonitoramento.lastCheckedCount = Number(payload.checked_count || 0);
+    if (options.auto && Number(payload.checked_count || 0) === 0) return false;
+
+    const finalStatus = payload.status === 'online' ? 'Online'
+      : payload.status === 'degraded' ? 'Instável'
+      : payload.status === 'offline' ? 'Offline'
+      : 'Sem teste';
+    const checkedAt = new Date().toISOString();
+    const p = payload.providers || {};
+    const resultSave = {
+      servidor_id: monitorKey,
+      servidor_nome: dominio.nome || '',
+      dominio_id: String(dominio.id),
+      dominio_nome: dominio.nome || '',
+      dominio_tipo: dominio.tipo || 'Monitoramento',
+      tipo_dns: 'monitor',
+      target: normalizeMonitorTarget(target),
+      url_testada: payload.url || target,
+      status: finalStatus,
+      provider_status: payload.status || '',
+      latency_ms: payload.latency_ms || null,
+      providers_usados: providersParam,
+      checked_count: payload.checked_count || 0,
+      globalping_status: p.globalping?.status || '',
+      globalping_latency_ms: p.globalping?.latency_ms || null,
+      globalping_probes_ok: p.globalping?.ok_probes || 0,
+      globalping_probes_total: p.globalping?.total_probes || 0,
+      globalping_detalhe: providerDetail(p.globalping),
+      openstatus_status: p.openstatus_lite?.status || '',
+      openstatus_latency_ms: p.openstatus_lite?.latency_ms || null,
+      openstatus_detalhe: providerDetail(p.openstatus_lite),
+      gatus_status: p.gatus?.status || '',
+      gatus_latency_ms: p.gatus?.latency_ms || null,
+      gatus_detalhe: providerDetail(p.gatus),
+      uptime_kuma_status: p.uptime_kuma?.status || '',
+      uptime_kuma_latency_ms: p.uptime_kuma?.latency_ms || null,
+      uptime_kuma_detalhe: providerDetail(p.uptime_kuma),
+      blackbox_status: p.blackbox?.status || '',
+      blackbox_latency_ms: p.blackbox?.latency_ms || null,
+      blackbox_detalhe: providerDetail(p.blackbox),
+      http_status: p.openstatus_lite?.http_status || null,
+      detalhe: payload.summary || '',
+      raw_result: JSON.stringify(payload).slice(0, 9000),
+      checked_at: checkedAt,
+      created_at: checkedAt
+    };
+
+    await db.from('monitoramentos_dns').insert(resultSave);
+    allMonitoramentosDNS.unshift(resultSave);
+
+    if (Number(payload.checked_count || 0) > 0 && finalStatus !== 'Sem teste') {
+      await db.from('dominios_monitoramento').update({
+        monitor_status: finalStatus,
+        monitor_ultima_verificacao: checkedAt,
+        monitor_latency_ms: payload.latency_ms || null
+      }).eq('id', dominio.id);
+      const localDominio = getDominioMonitoramentoById(dominio.id);
+      if (localDominio) {
+        localDominio.monitor_status = finalStatus;
+        localDominio.monitor_ultima_verificacao = checkedAt;
+        localDominio.monitor_latency_ms = payload.latency_ms || null;
+      }
+    }
+
+    if (!options.silent) toast(`Domínio monitorado: ${finalStatus}`, finalStatus === 'Offline' ? 'error' : 'success');
+    if (options.noReload) renderDNSMonitoramento();
+    else await loadIPTV();
+    return Number(payload.checked_count || 0) > 0;
+  } catch (e) {
+    console.error('Erro no monitoramento do domínio:', e);
+    if (!options.silent) toast('Erro ao verificar domínio: ' + e.message, 'error');
+    return false;
+  } finally {
+    if (btnTodos && !options.batch) btnTodos.disabled = false;
+  }
+}
+
+async function verificarDNSServidor(servidorId, tipo = 'principal', options = {}) {
+  verificarDNSServidor.lastCheckedCount = 0;
+  const servidor = getServidorById(servidorId);
+  if (!servidor) return false;
+  const target = tipo === 'reserva' ? servidor.dns_reserva : servidor.dns;
+  if (!target) {
+    if (!options.silent) toast(tipo === 'reserva' ? 'Esse servidor não tem DNS reserva.' : 'Esse servidor não tem DNS principal.', 'error');
+    return false;
+  }
+
+  const requestedProviders = Array.isArray(options.providers) && options.providers.length
+    ? options.providers
+    : ['globalping', 'openstatus_lite', 'gatus', 'uptime_kuma', 'blackbox'];
+
+  const latest = getLatestMonitorDNS(servidor.id, tipo);
+  const waitMin = minutesUntilNextDNSCheck(latest);
+  if (waitMin && !options.force && !options.auto) {
+    if (!options.silent) toast(`Esse DNS já foi verificado recentemente. Aguarde ${waitMin} min para não extrapolar limite.`, 'info');
+    return false;
+  }
+
+  const btnTodos = $('btn-verificar-todos-dns');
+  if (btnTodos && !options.batch) btnTodos.disabled = true;
+  if (!options.silent) {
+    const nomes = requestedProviders.map(p => DNS_PROVIDER_META[p]?.label || p).join(', ');
+    toast(`Verificando ${servidor.nome || 'servidor'} com ${nomes}...`, 'info');
+  }
+
+  try {
+    const providersParam = requestedProviders.join(',');
+    const url = `/api/check-domain?target=${encodeURIComponent(target)}&servidor=${encodeURIComponent(servidor.nome || '')}&providers=${encodeURIComponent(providersParam)}`;
+    const res = await fetch(url);
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error) throw new Error(payload.error || 'Falha ao verificar domínio.');
+
+    verificarDNSServidor.lastCheckedCount = Number(payload.checked_count || 0);
+    if (options.auto && Number(payload.checked_count || 0) === 0) {
+      return false;
+    }
+
+    const finalStatus = payload.status === 'online' ? 'Online'
+      : payload.status === 'degraded' ? 'Instável'
+      : payload.status === 'offline' ? 'Offline'
+      : 'Sem teste';
+    const checkedAt = new Date().toISOString();
+    const p = payload.providers || {};
+    const resultSave = {
+      servidor_id: String(servidor.id),
+      servidor_nome: servidor.nome || '',
+      tipo_dns: tipo,
+      target: normalizeMonitorTarget(target),
+      url_testada: payload.url || target,
+      status: finalStatus,
+      provider_status: payload.status || '',
+      latency_ms: payload.latency_ms || null,
+      providers_usados: providersParam,
+      checked_count: payload.checked_count || 0,
+      globalping_status: p.globalping?.status || '',
+      globalping_latency_ms: p.globalping?.latency_ms || null,
+      globalping_probes_ok: p.globalping?.ok_probes || 0,
+      globalping_probes_total: p.globalping?.total_probes || 0,
+      globalping_detalhe: providerDetail(p.globalping),
+      openstatus_status: p.openstatus_lite?.status || '',
+      openstatus_latency_ms: p.openstatus_lite?.latency_ms || null,
+      openstatus_detalhe: providerDetail(p.openstatus_lite),
+      gatus_status: p.gatus?.status || '',
+      gatus_latency_ms: p.gatus?.latency_ms || null,
+      gatus_detalhe: providerDetail(p.gatus),
+      uptime_kuma_status: p.uptime_kuma?.status || '',
+      uptime_kuma_latency_ms: p.uptime_kuma?.latency_ms || null,
+      uptime_kuma_detalhe: providerDetail(p.uptime_kuma),
+      blackbox_status: p.blackbox?.status || '',
+      blackbox_latency_ms: p.blackbox?.latency_ms || null,
+      blackbox_detalhe: providerDetail(p.blackbox),
+      http_status: p.openstatus_lite?.http_status || null,
+      detalhe: payload.summary || '',
+      raw_result: JSON.stringify(payload).slice(0, 9000),
+      checked_at: checkedAt,
+      created_at: checkedAt
+    };
+
+    await db.from('monitoramentos_dns').insert(resultSave);
+    allMonitoramentosDNS.unshift(resultSave);
+
+    if (tipo === 'principal' && Number(payload.checked_count || 0) > 0 && finalStatus !== 'Sem teste') {
+      await db.from('servidores_iptv').update({
+        status: finalStatus,
+        monitor_status: finalStatus,
+        monitor_ultima_verificacao: checkedAt,
+        monitor_latency_ms: payload.latency_ms || null
+      }).eq('id', servidor.id);
+      const localServidor = getServidorById(servidor.id);
+      if (localServidor) {
+        localServidor.status = finalStatus;
+        localServidor.monitor_status = finalStatus;
+        localServidor.monitor_ultima_verificacao = checkedAt;
+        localServidor.monitor_latency_ms = payload.latency_ms || null;
+      }
+    }
+
+    if (!options.silent) toast(`DNS ${tipo === 'reserva' ? 'reserva' : 'principal'}: ${finalStatus}`, finalStatus === 'Offline' ? 'error' : 'success');
+    if (options.noReload) renderDNSMonitoramento();
+    else await loadIPTV();
+    return Number(payload.checked_count || 0) > 0;
+  } catch (e) {
+    console.error('Erro no monitoramento DNS:', e);
+    if (!options.silent) toast('Erro ao verificar DNS: ' + e.message, 'error');
+    return false;
+  } finally {
+    if (btnTodos && !options.batch) btnTodos.disabled = false;
+  }
+}
+
+async function verificarTodosDNS() {
+  const dominios = getDominiosMonitoramentoAtivos();
+  if (!dominios.length) {
+    toast('Nenhum domínio cadastrado na aba de monitoramento.', 'error');
+    return;
+  }
+
+  const pendentes = dominios
+    .filter(d => !minutesUntilNextDNSCheck(getLatestMonitorDominio(d.id)))
+    .slice(0, DNS_MONITOR_BATCH_MAX);
+  const recentes = dominios.length - pendentes.length;
+  if (!pendentes.length) {
+    toast('Todos os domínios cadastrados foram verificados recentemente. Aguarde para não extrapolar limites.', 'info');
+    return;
+  }
+
+  const ok = confirm(`Verificar ${pendentes.length} domínio(s) cadastrado(s) agora?\n\nModo seguro ativo:\n• máximo ${DNS_MONITOR_BATCH_MAX} por lote\n• intervalo de 15 min por domínio no modo manual\n• pausa de ${Math.round(DNS_MONITOR_BATCH_DELAY_MS / 1000)}s entre testes\n${recentes > 0 ? `• ${recentes} domínio(s) recente(s) serão pulados` : ''}`);
+  if (!ok) return;
+
+  const btn = $('btn-verificar-todos-dns');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verificando...'; }
+
+  let feitos = 0;
+  for (const dominio of pendentes) {
+    if (btn) btn.textContent = `Verificando ${feitos + 1}/${pendentes.length}`;
+    const okCheck = await verificarDominioMonitoramento(dominio.id, { batch: true, silent: true });
+    if (okCheck) feitos++;
+    await new Promise(r => setTimeout(r, DNS_MONITOR_BATCH_DELAY_MS));
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '🌐 Verificar pendentes'; }
+  toast(`Verificação segura finalizada: ${feitos}/${pendentes.length} domínio(s) testado(s).`, 'success');
+}
+
+if ($('btn-add-dominio-monitor')) $('btn-add-dominio-monitor').addEventListener('click', openAddDominioMonitoramento);
+if ($('dominio-monitor-close')) $('dominio-monitor-close').addEventListener('click', () => hide('modal-dominio-monitor'));
+if ($('dominio-monitor-cancelar')) $('dominio-monitor-cancelar').addEventListener('click', () => hide('modal-dominio-monitor'));
+if ($('form-dominio-monitor')) $('form-dominio-monitor').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = $('dm-id').value;
+  const payload = {
+    nome: $('dm-nome').value.trim(),
+    target: $('dm-target').value.trim(),
+    tipo: $('dm-tipo').value,
+    servidor_id: $('dm-servidor').value || '',
+    ativo: $('dm-ativo').value === 'true',
+    observacao: $('dm-observacao').value.trim()
+  };
+  if (!payload.nome) payload.nome = payload.target;
+  if (!payload.target) { $('dominio-monitor-error').textContent = 'Informe o domínio ou URL.'; show('dominio-monitor-error'); return; }
+  const result = id ? await db.from('dominios_monitoramento').update(payload).eq('id', id) : await db.from('dominios_monitoramento').insert(payload);
+  if (result.error) { $('dominio-monitor-error').textContent = 'Erro: ' + result.error.message; show('dominio-monitor-error'); return; }
+  hide('modal-dominio-monitor');
+  toast(id ? 'Domínio atualizado no monitoramento!' : 'Domínio cadastrado no monitoramento!', 'success');
+  await loadIPTV();
+});
+
+if ($('btn-verificar-todos-dns')) $('btn-verificar-todos-dns').addEventListener('click', verificarTodosDNS);
+if ($('btn-atualizar-dns-monitor')) $('btn-atualizar-dns-monitor').addEventListener('click', loadIPTV);
+if ($('btn-auto-dns-monitor')) $('btn-auto-dns-monitor').addEventListener('click', toggleAutoDNSMonitor);
+updateAutoDNSButton();
+if (dnsAutoMonitorEnabled) startAutoDNSMonitor();
+
+
+function calcularCreditos30Dias() {
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const limite = new Date(hoje); limite.setDate(limite.getDate() + 30);
+  const porServidor = {};
+  for (const c of allClientes) {
+    const venc = parseDateTime(c.vencimento, false);
+    if (!venc || venc < hoje || venc > limite) continue;
+    const sid = c.servidor_id || 'sem-servidor';
+    const telas = Math.max(1, parseInt(c.telas || '1', 10));
+    porServidor[sid] = (porServidor[sid] || 0) + telas;
+  }
+  const total = Object.values(porServidor).reduce((a, b) => a + b, 0);
+  return { total, porServidor };
+}
+
+function renderIPTVCreditos() {
+  const box = $('iptv-creditos-list');
+  if (!box) return;
+  const { porServidor } = calcularCreditos30Dias();
+  const items = Object.entries(porServidor).sort((a, b) => b[1] - a[1]);
+  if (!items.length) {
+    box.innerHTML = '<div class="credito-item"><div class="credito-main"><div class="credito-title">Sem créditos previstos</div><div class="credito-sub">Nenhum cliente vence nos próximos 30 dias.</div></div></div>';
+    return;
+  }
+  box.innerHTML = items.map(([sid, qtd]) => {
+    const servidor = sid === 'sem-servidor' ? null : getServidorById(sid);
+    const disponiveis = parseInt(servidor?.creditos_disponiveis || 0, 10);
+    const falta = Math.max(0, qtd - disponiveis);
+    return `<div class="credito-item">
+      <div class="credito-main"><div class="credito-title">${escapeHTML(servidor?.nome || 'Sem servidor')}</div><div class="credito-sub">Necessários em 30 dias: ${qtd} • disponíveis: ${disponiveis}</div></div>
+      <span class="iptv-pill ${falta ? 'red' : 'green'}">${falta ? 'Faltam ' + falta : 'OK'}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderIPTVProblemasRanking() {
+  const box = $('iptv-problemas-ranking');
+  if (!box) return;
+  const rank = {};
+  for (const p of allProblemasIPTV) {
+    const key = p.servidor_id || 'sem-servidor';
+    if (!rank[key]) rank[key] = { total: 0, abertos: 0, tipos: {} };
+    rank[key].total++;
+    if ((p.status || 'Aberto') !== 'Resolvido') rank[key].abertos++;
+    rank[key].tipos[p.tipo || 'Outro'] = (rank[key].tipos[p.tipo || 'Outro'] || 0) + 1;
+  }
+  const items = Object.entries(rank).sort((a, b) => b[1].total - a[1].total);
+  if (!items.length) {
+    box.innerHTML = '<div class="problem-item"><div class="problem-main"><div class="problem-title">Sem problemas registrados</div><div class="problem-sub">Quando registrar reclamações, o ranking aparece aqui.</div></div></div>';
+    return;
+  }
+  box.innerHTML = items.map(([sid, st]) => {
+    const servidor = sid === 'sem-servidor' ? null : getServidorById(sid);
+    const topTipo = Object.entries(st.tipos).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+    return `<div class="problem-item">
+      <div class="problem-main"><div class="problem-title">${escapeHTML(servidor?.nome || 'Sem servidor')}</div><div class="problem-sub">Principal: ${escapeHTML(topTipo)} • ${st.abertos} em aberto</div></div>
+      <span class="iptv-pill ${st.abertos ? 'yellow' : 'green'}">${st.total}</span>
+    </div>`;
+  }).join('');
+}
+
+function openAddServidor() {
+  $('modal-servidor-titulo').textContent = 'Novo Servidor IPTV';
+  $('form-servidor-iptv').reset();
+  $('sv-id').value = '';
+  $('sv-status').value = 'Online';
+  hide('servidor-error');
+  show('modal-servidor-iptv');
+}
+
+function openEditServidor(id) {
+  const s = getServidorById(id);
+  if (!s) return;
+  $('modal-servidor-titulo').textContent = 'Editar Servidor IPTV';
+  $('sv-id').value = s.id;
+  $('sv-nome').value = s.nome || '';
+  $('sv-status').value = s.status || 'Online';
+  $('sv-dns').value = s.dns || '';
+  $('sv-dns-reserva').value = s.dns_reserva || '';
+  $('sv-custo-credito').value = s.custo_credito || '';
+  $('sv-creditos').value = s.creditos_disponiveis || '';
+  $('sv-observacao').value = s.observacao || '';
+  hide('servidor-error');
+  show('modal-servidor-iptv');
+}
+
+async function deleteServidorIPTV(id) {
+  const s = getServidorById(id);
+  if (!s) return;
+  if (!confirm(`Excluir o servidor ${s.nome}?\nOs clientes não serão apagados, mas podem ficar sem referência de servidor.`)) return;
+  const { error } = await db.from('servidores_iptv').delete().eq('id', id);
+  if (error) { toast('Erro ao excluir servidor.', 'error'); return; }
+  toast('Servidor excluído.', 'success');
+  await loadIPTV();
+}
+
+function openProblemaModal(clienteId = '') {
+  updateProblemaClienteSelect();
+  updateSelectServidores();
+  $('form-problema-iptv').reset();
+  if (clienteId) {
+    $('prob-cliente').value = clienteId;
+    const c = allClientes.find(x => String(x.id) === String(clienteId));
+    if (c?.servidor_id) $('prob-servidor').value = c.servidor_id;
+  }
+  hide('problema-error');
+  show('modal-problema-iptv');
+}
+
+function renderMigracaoList() {
+  const list = $('mig-clientes-list');
+  if (!list) return;
+  const origem = $('mig-origem')?.value || '';
+  if (!origem) {
+    list.innerHTML = '<div class="migration-item"><div class="migration-main"><div class="migration-title">Selecione um servidor atual</div><div class="migration-sub">A lista de clientes para migração aparece aqui.</div></div></div>';
+    hide('mig-msg-box');
+    return;
+  }
+  const clientes = getClientesDoServidor(allClientes, origem);
+  if (!clientes.length) {
+    list.innerHTML = '<div class="migration-item"><div class="migration-main"><div class="migration-title">Nenhum cliente nesse servidor</div><div class="migration-sub">Escolha outro servidor atual.</div></div></div>';
+    return;
+  }
+  list.innerHTML = clientes.slice(0, 120).map(c => `<div class="migration-item">
+    <div class="migration-main"><div class="migration-title">${escapeHTML(c.nome || 'Cliente')}</div><div class="migration-sub">${escapeHTML(c.whatsapp || '')} • ${escapeHTML(c.app_nome || 'App não informado')} • ${escapeHTML(c.dispositivo || 'Dispositivo não informado')}</div></div>
+    <button class="action-btn action-edit" onclick="openEdit(${JSON.stringify(c.id)})">Abrir</button>
+  </div>`).join('');
+}
+
+function gerarMensagemMigracao() {
+  const origem = getServidorById($('mig-origem')?.value || '');
+  const destino = getServidorById($('mig-destino')?.value || '');
+  if (!origem || !destino) return '';
+  return `Olá! Estamos fazendo uma atualização no acesso para melhorar a estabilidade.\n\nNova DNS/Servidor: ${destino.dns || destino.nome}\nDNS reserva: ${destino.dns_reserva || 'não necessário'}\n\nSe tiver dificuldade para atualizar no aplicativo, me chama aqui que eu te ajudo.`;
+}
+
+function copiarMensagemMigracao() {
+  const msg = gerarMensagemMigracao();
+  if (!msg) { toast('Selecione servidor atual e novo servidor.', 'error'); return; }
+  const box = $('mig-msg-box');
+  if (box) { box.textContent = msg; show('mig-msg-box'); }
+  navigator.clipboard?.writeText(msg).then(() => toast('Mensagem de migração copiada!', 'success')).catch(() => toast('Mensagem gerada. Copie manualmente.', 'info'));
+}
+
+if ($('btn-add-servidor')) $('btn-add-servidor').addEventListener('click', openAddServidor);
+if ($('servidor-close')) $('servidor-close').addEventListener('click', () => hide('modal-servidor-iptv'));
+if ($('servidor-cancelar')) $('servidor-cancelar').addEventListener('click', () => hide('modal-servidor-iptv'));
+if ($('form-servidor-iptv')) $('form-servidor-iptv').addEventListener('submit', async e => {
+  e.preventDefault();
+  const id = $('sv-id').value;
+  const payload = {
+    nome: $('sv-nome').value.trim(),
+    status: $('sv-status').value,
+    dns: $('sv-dns').value.trim(),
+    dns_reserva: $('sv-dns-reserva').value.trim(),
+    custo_credito: toMoneyNumber($('sv-custo-credito').value),
+    creditos_disponiveis: parseInt($('sv-creditos').value || '0', 10),
+    observacao: $('sv-observacao').value.trim()
+  };
+  if (!payload.nome) { $('servidor-error').textContent = 'Nome obrigatório.'; show('servidor-error'); return; }
+  const result = id ? await db.from('servidores_iptv').update(payload).eq('id', id) : await db.from('servidores_iptv').insert(payload);
+  if (result.error) { $('servidor-error').textContent = 'Erro: ' + result.error.message; show('servidor-error'); return; }
+  hide('modal-servidor-iptv');
+  toast(id ? 'Servidor atualizado!' : 'Servidor criado!', 'success');
+  await loadIPTV();
+});
+
+if ($('btn-add-problema')) $('btn-add-problema').addEventListener('click', () => openProblemaModal());
+if ($('problema-close')) $('problema-close').addEventListener('click', () => hide('modal-problema-iptv'));
+if ($('problema-cancelar')) $('problema-cancelar').addEventListener('click', () => hide('modal-problema-iptv'));
+if ($('form-problema-iptv')) $('form-problema-iptv').addEventListener('submit', async e => {
+  e.preventDefault();
+  const cliente = allClientes.find(c => String(c.id) === String($('prob-cliente').value));
+  const servidor = getServidorById($('prob-servidor').value);
+  const payload = {
+    cliente_id: cliente?.id || null,
+    cliente_nome: cliente?.nome || '',
+    servidor_id: servidor?.id || '',
+    servidor_nome: servidor?.nome || '',
+    tipo: $('prob-tipo').value,
+    status: $('prob-status').value,
+    observacao: $('prob-observacao').value.trim(),
+    created_at: new Date().toISOString()
+  };
+  const { error } = await db.from('problemas_iptv').insert(payload);
+  if (error) { $('problema-error').textContent = 'Erro: ' + error.message; show('problema-error'); return; }
+  hide('modal-problema-iptv');
+  toast('Problema técnico registrado!', 'success');
+  await loadIPTV();
+});
+
+if ($('btn-listar-migracao')) $('btn-listar-migracao').addEventListener('click', renderMigracaoList);
+if ($('btn-copiar-msg-migracao')) $('btn-copiar-msg-migracao').addEventListener('click', copiarMensagemMigracao);
+if ($('mig-origem')) $('mig-origem').addEventListener('change', renderMigracaoList);
+if ($('mig-destino')) $('mig-destino').addEventListener('change', () => {
+  const msg = gerarMensagemMigracao();
+  const box = $('mig-msg-box');
+  if (box && msg) { box.textContent = msg; show('mig-msg-box'); }
+});
+if ($('cl-servidor-id')) $('cl-servidor-id').addEventListener('change', () => {
+  const s = getServidorById($('cl-servidor-id').value);
+  if (s && $('cl-dns-iptv') && !$('cl-dns-iptv').value) $('cl-dns-iptv').value = s.dns || '';
 });
 
 // === CONFIGURAÇÕES & 2FA ===

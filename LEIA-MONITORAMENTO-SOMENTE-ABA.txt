@@ -1,0 +1,21 @@
+MONITORAMENTO DNS - AJUSTE IMPORTANTE
+
+Esta versão NÃO monitora mais automaticamente todos os DNS cadastrados nos servidores IPTV.
+
+Agora o monitoramento usa somente a coleção/domínios cadastrados na própria aba:
+Operação IPTV > Monitoramento de DNS / Domínios > + Domínio
+
+Funcionamento:
+- Você cadastra manualmente o domínio que quer monitorar.
+- O botão Verificar testa apenas os domínios cadastrados nesta aba.
+- O botão Verificar pendentes testa apenas os domínios cadastrados nesta aba.
+- O Auto 60s alterna os verificadores apenas nos domínios cadastrados nesta aba.
+
+Sobre 24/7:
+- O Auto 60s do painel roda somente enquanto o sistema/PWA estiver aberto.
+- Para monitorar 24 horas por dia, 7 dias por semana, com o app fechado, é necessário criar rotina backend/cron.
+- Como os domínios são salvos no Firebase, uma rotina 24/7 segura precisa de acesso servidor ao Firebase, normalmente com Service Account configurada na Vercel.
+
+Coleções usadas:
+- dominios_monitoramento: lista dos domínios cadastrados na aba.
+- monitoramentos_dns: histórico dos testes realizados.
