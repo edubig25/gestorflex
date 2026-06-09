@@ -1,0 +1,15 @@
+ARQUIVOS NA RAIZ DO PROJETO
+
+Este ZIP foi preparado sem pasta principal dentro.
+
+Ao enviar para o GitHub:
+1. Abra o ZIP.
+2. Selecione os arquivos e pastas de dentro.
+3. Envie tudo na raiz do repositório.
+
+Os arquivos index.html, app.js, style.css, config.html e configurar_firebase_vercel.html precisam ficar soltos na raiz.
+
+IMPORTANTE:
+- A pasta api precisa continuar como pasta, porque a Vercel usa api/check-domain.js e api/cron-monitor-dns.js.
+- Não suba serviceAccountKey.json no GitHub.
+- Depois de configurar a variável do Firebase, apague config.html e configurar_firebase_vercel.html do GitHub.
